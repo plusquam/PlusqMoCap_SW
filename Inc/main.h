@@ -58,6 +58,14 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define SPI1_CS_0_Pin GPIO_PIN_2
+#define SPI1_CS_0_GPIO_Port GPIOA
+#define SPI1_CS_1_Pin GPIO_PIN_3
+#define SPI1_CS_1_GPIO_Port GPIOA
+#define SPI1_CS_2_Pin GPIO_PIN_4
+#define SPI1_CS_2_GPIO_Port GPIOA
+#define SPI1_CS_3_Pin GPIO_PIN_5
+#define SPI1_CS_3_GPIO_Port GPIOA
 #define B1_Pin GPIO_PIN_4
 #define B1_GPIO_Port GPIOC
 #define LD2_Pin GPIO_PIN_0
@@ -81,6 +89,8 @@ void Error_Handler(void);
 #define STLINK_TX_Pin GPIO_PIN_7
 #define STLINK_TX_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
+
+extern SPI_HandleTypeDef hspi1;
 
 /* USER CODE END Private defines */
 
