@@ -35,17 +35,9 @@
 #define MPU9250
 #include "stm32_mpu9250_spi.h"
 #include "MPU9250_RegisterMap.h"
-#include "stm32wbxx_hal.h"
 #include "arduino_mpu9250_log.h"
-#define delay_ms  HAL_Delay
-static int getMsWrapper(unsigned long *count)
-{
-	*count = HAL_GetTick();
-	return 0;
-}
-#define get_ms    getMsWrapper
-#define log_i     //
-#define log_e     //
+#include "stm32_utils.h"
+
 static inline int reg_int_cb(struct int_param_s *int_param)
 {
 	return 0;

@@ -23,6 +23,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <SparkFunMPU9250-DMP.h>
+#include "stm32_utils.h"
 
 /* USER CODE END Includes */
 
@@ -42,6 +44,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+RTC_HandleTypeDef hrtc;
 
 SPI_HandleTypeDef hspi1;
 
@@ -56,13 +59,149 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SPI1_Init(void);
-static void MX_RF_Init(void);
+static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+MPU9250_DMP imu;
+
+void setup()
+{
+  // Call imu.begin() to verify communication with and
+  // initialize the MPU-9250 to it's default values.
+  // Most functions return an error code - INV_SUCCESS (0)
+  // indicates the IMU was present and successfully set up
+  if (imu.begin() != INV_SUCCESS)
+  {
+    while (1)
+    {
+      printf("Unable to communicate with MPU-9250");
+      printf("Check connections, and try again.");
+      HAL_Delay(5000);
+    }
+  }
+
+  // Use setSensors to turn on or off MPU-9250 sensors.
+  // Any of the following defines can be combined:
+  // INV_XYZ_GYRO, INV_XYZ_ACCEL, INV_XYZ_COMPASS,
+  // INV_X_GYRO, INV_Y_GYRO, or INV_Z_GYRO
+  // Enable all sensors:
+  imu.setSensors(INV_XYZ_ACCEL);
+
+  // Use setGyroFSR() and setAccelFSR() to configure the
+  // gyroscope and accelerometer full scale ranges.
+  // Gyro options are +/- 250, 500, 1000, or 2000 dps
+//  imu.setGyroFSR(2000); // Set gyro to 2000 dps
+  // Accel options are +/- 2, 4, 8, or 16 g
+  imu.setAccelFSR(2); // Set accel to +/-2g
+  // Note: the MPU-9250's magnetometer FSR is set at
+  // +/- 4912 uT (micro-tesla's)
+
+  // setLPF() can be used to set the digital low-pass filter
+  // of the accelerometer and gyroscope.
+  // Can be any of the following: 188, 98, 42, 20, 10, 5
+  // (values are in Hz).
+  imu.setLPF(5); // Set LPF corner frequency to 5Hz
+
+  // The sample rate of the accel/gyro can be set using
+  // setSampleRate. Acceptable values range from 4Hz to 1kHz
+  imu.setSampleRate(10); // Set sample rate to 10Hz
+
+  // Likewise, the compass (magnetometer) sample rate can be
+  // set using the setCompassSampleRate() function.
+  // This value can range between: 1-100Hz
+  imu.setCompassSampleRate(10); // Set mag rate to 10Hz
+}
+
+// prints a number with 2 digits following the decimal place
+// creates the string backwards, before printing it character-by-character from
+// the end to the start
+//
+// Usage: myPrintf(270.458)
+//  Output: 270.45
+void myString(float fVal, char *string)
+{
+    int dVal, dec, i;
+
+    fVal += 0.005;   // added after a comment from Matt McNabb, see below.
+
+    dVal = fVal;
+    dec = (int)(fVal * 100) % 100;
+
+    string[0] = (dec % 10) + '0';
+    string[1] = (dec / 10) + '0';
+    string[2] = '.';
+
+    i = 3;
+    while (dVal > 0)
+    {
+    	string[i] = (dVal % 10) + '0';
+        dVal /= 10;
+        i++;
+    }
+
+    string[i] = '\0';
+}
+
+void printIMUData(void)
+{
+  // After calling update() the ax, ay, az, gx, gy, gz, mx,
+  // my, mz, time, and/or temerature class variables are all
+  // updated. Access them by placing the object. in front:
+
+  // Use the calcAccel, calcGyro, and calcMag functions to
+  // convert the raw sensor readings (signed 16-bit values)
+  // to their respective units.
+  float accelX = imu.calcAccel(imu.ax);
+  float accelY = imu.calcAccel(imu.ay);
+  float accelZ = imu.calcAccel(imu.az);
+  float gyroX = imu.calcGyro(imu.gx);
+  float gyroY = imu.calcGyro(imu.gy);
+  float gyroZ = imu.calcGyro(imu.gz);
+  float magX = imu.calcMag(imu.mx);
+  float magY = imu.calcMag(imu.my);
+  float magZ = imu.calcMag(imu.mz);
+
+  char str1[20], str2[20], str3[30];
+
+  printf("Accel: %d g\n", imu.ax);
+  myString(accelX, str1);
+  myString(accelY, str2);
+  myString(accelZ, str3);
+  printf("Accel: %s, %s, %s g\n", str1, str2, str3);
+  myString(gyroX, str1);
+    myString(gyroY, str2);
+    myString(gyroZ, str3);
+  printf("Gyro: %s, %s, %s dps\n", str1, str2, str3);
+  myString(magX, str1);
+    myString(magY, str2);
+    myString(magZ, str3);
+  printf("Mag: %s, %s, %s uT\n", str1, str2, str3);
+  printf("Time: %lu ms\n\n", imu.time);
+}
+
+void loop()
+{
+  // dataReady() checks to see if new accel/gyro data
+  // is available. It will return a boolean true or false
+  // (New magnetometer data cannot be checked, as the library
+  //  runs that sensor in single-conversion mode.)
+  if ( imu.dataReady() )
+  {
+    // Call update() to update the imu objects sensor data.
+    // You can specify which sensors to update by combining
+    // UPDATE_ACCEL, UPDATE_GYRO, UPDATE_COMPASS, and/or
+    // UPDATE_TEMPERATURE.
+    // (The update function defaults to accel, gyro, compass,
+    //  so you don't have to specify these values.)
+    imu.update(UPDATE_ACCEL);// | UPDATE_GYRO | UPDATE_COMPASS);
+    printIMUData();
+  }
+}
 
 /* USER CODE END 0 */
 
@@ -97,8 +236,12 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   MX_SPI1_Init();
-  MX_RF_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+//  uint8_t chars[] = "ca\n";
+
+  setup();
+
 
   /* USER CODE END 2 */
 
@@ -107,9 +250,18 @@ int main(void)
   while (1)
   {
 	  HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
-	  HAL_Delay(200);
+
+	  loop();
+	  printIMUData();
+	  HAL_Delay(50);
 	  HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
-	  HAL_Delay(200);
+	  HAL_Delay(50);
+
+//	  chars[0] += (uint8_t)1u;
+//	  if(chars[0] >'z')
+//		  chars[0] = 'a';
+//
+//	  printf("%s", chars);
 
     /* USER CODE END WHILE */
 
@@ -168,10 +320,10 @@ void SystemClock_Config(void)
   }
   /** Initializes the peripherals clocks 
   */
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SMPS|RCC_PERIPHCLK_RFWAKEUP
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SMPS|RCC_PERIPHCLK_RTC
                               |RCC_PERIPHCLK_USART1;
   PeriphClkInitStruct.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
-  PeriphClkInitStruct.RFWakeUpClockSelection = RCC_RFWKPCLKSOURCE_LSI;
+  PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
   PeriphClkInitStruct.SmpsClockSelection = RCC_SMPSCLKSOURCE_HSE;
   PeriphClkInitStruct.SmpsDivSelection = RCC_SMPSCLKDIV_RANGE1;
 
@@ -182,23 +334,37 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief RF Initialization Function
+  * @brief RTC Initialization Function
   * @param None
   * @retval None
   */
-static void MX_RF_Init(void)
+static void MX_RTC_Init(void)
 {
 
-  /* USER CODE BEGIN RF_Init 0 */
+  /* USER CODE BEGIN RTC_Init 0 */
 
-  /* USER CODE END RF_Init 0 */
+  /* USER CODE END RTC_Init 0 */
 
-  /* USER CODE BEGIN RF_Init 1 */
+  /* USER CODE BEGIN RTC_Init 1 */
 
-  /* USER CODE END RF_Init 1 */
-  /* USER CODE BEGIN RF_Init 2 */
+  /* USER CODE END RTC_Init 1 */
+  /** Initialize RTC Only 
+  */
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutRemap = RTC_OUTPUT_REMAP_NONE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RTC_Init 2 */
 
-  /* USER CODE END RF_Init 2 */
+  /* USER CODE END RTC_Init 2 */
 
 }
 
@@ -231,7 +397,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi1.Init.CRCPolynomial = 7;
   hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+  hspi1.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
   if (HAL_SPI_Init(&hspi1) != HAL_OK)
   {
     Error_Handler();
@@ -258,7 +424,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 230400;
   huart1.Init.WordLength = UART_WORDLENGTH_9B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_ODD;

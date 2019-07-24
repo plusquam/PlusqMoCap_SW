@@ -91,6 +91,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 
 extern SPI_HandleTypeDef hspi1;
+extern UART_HandleTypeDef huart1;
 
 /* USER CODE END Private defines */
 
