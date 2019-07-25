@@ -71,50 +71,23 @@ MPU9250_DMP imu;
 
 void setup()
 {
-  // Call imu.begin() to verify communication with and
-  // initialize the MPU-9250 to it's default values.
-  // Most functions return an error code - INV_SUCCESS (0)
-  // indicates the IMU was present and successfully set up
-  if (imu.begin() != INV_SUCCESS)
-  {
-    while (1)
-    {
-      printf("Unable to communicate with MPU-9250");
-      printf("Check connections, and try again.");
-      HAL_Delay(5000);
-    }
-  }
+	// Call imu.begin() to verify communication and initialize
+	if (imu.begin() != INV_SUCCESS)
+	{
+		while (1)
+		{
+			printf("Unable to communicate with MPU-9250\n");
+			printf("Check connections, and try again.\n");
+			HAL_Delay(5000);
+		}
+	}
 
-  // Use setSensors to turn on or off MPU-9250 sensors.
-  // Any of the following defines can be combined:
-  // INV_XYZ_GYRO, INV_XYZ_ACCEL, INV_XYZ_COMPASS,
-  // INV_X_GYRO, INV_Y_GYRO, or INV_Z_GYRO
-  // Enable all sensors:
-  imu.setSensors(INV_XYZ_ACCEL | INV_XYZ_GYRO | INV_XYZ_COMPASS);
-
-  // Use setGyroFSR() and setAccelFSR() to configure the
-  // gyroscope and accelerometer full scale ranges.
-  // Gyro options are +/- 250, 500, 1000, or 2000 dps
-  imu.setGyroFSR(500); // Set gyro to 2000 dps
-  // Accel options are +/- 2, 4, 8, or 16 g
-  imu.setAccelFSR(4); // Set accel to +/-2g
-  // Note: the MPU-9250's magnetometer FSR is set at
-  // +/- 4912 uT (micro-tesla's)
-
-  // setLPF() can be used to set the digital low-pass filter
-  // of the accelerometer and gyroscope.
-  // Can be any of the following: 188, 98, 42, 20, 10, 5
-  // (values are in Hz).
-  imu.setLPF(10); // Set LPF corner frequency to 5Hz
-
-  // The sample rate of the accel/gyro can be set using
-  // setSampleRate. Acceptable values range from 4Hz to 1kHz
-  imu.setSampleRate(4); // Set sample rate to 10Hz
-
-  // Likewise, the compass (magnetometer) sample rate can be
-  // set using the setCompassSampleRate() function.
-  // This value can range between: 1-100Hz
-  imu.setCompassSampleRate(4); // Set mag rate to 10Hz
+	imu.dmpBegin(	DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
+					DMP_FEATURE_GYRO_CAL, // Use gyro calibration
+					10); // Set DMP FIFO rate to 10 Hz
+	// DMP_FEATURE_LP_QUAT can also be used. It uses the
+	// accelerometer in low-power mode to estimate quat's.
+	// DMP_FEATURE_LP_QUAT and 6X_LP_QUAT are mutually exclusive
 }
 
 #include <cmath>
@@ -179,58 +152,47 @@ void myString(float fVal, char *string)
 
 void printIMUData(void)
 {
-  // After calling update() the ax, ay, az, gx, gy, gz, mx,
-  // my, mz, time, and/or temerature class variables are all
-  // updated. Access them by placing the object. in front:
+	char str1[10], str2[10];
 
-  // Use the calcAccel, calcGyro, and calcMag functions to
-  // convert the raw sensor readings (signed 16-bit values)
-  // to their respective units.
-  float accelX = imu.calcAccel(imu.ax);
-  float accelY = imu.calcAccel(imu.ay);
-  float accelZ = imu.calcAccel(imu.az);
-  float gyroX = imu.calcGyro(imu.gx);
-  float gyroY = imu.calcGyro(imu.gy);
-  float gyroZ = imu.calcGyro(imu.gz);
-  float magX = imu.calcMag(imu.mx);
-  float magY = imu.calcMag(imu.my);
-  float magZ = imu.calcMag(imu.mz);
+	// After calling dmpUpdateFifo() the ax, gx, mx, etc. values
+	// are all updated.
+	// Quaternion values are, by default, stored in Q30 long
+	// format. calcQuat turns them into a float between -1 and 1
+	float q0 = imu.calcQuat(imu.qw);
+	float q1 = imu.calcQuat(imu.qx);
+	float q2 = imu.calcQuat(imu.qy);
+	float q3 = imu.calcQuat(imu.qz);
 
-  char str1[10], str2[10], str3[10];
+	myString(q0, str1);
+	myString(q1, str2);
+	printf("Q: %s, %s", str1, str2);
 
-//  printf("Accel: %d g\n", imu.ax);
-  myString(accelX, str1);
-  myString(accelY, str2);
-  myString(accelZ, str3);
-  printf("Accel: %s, %s, %s g\n", str1, str2, str3);
-  myString(gyroX, str1);
-    myString(gyroY, str2);
-    myString(gyroZ, str3);
-  printf("Gyro: %s, %s, %s dps\n", str1, str2, str3);
-  myString(magX, str1);
-    myString(magY, str2);
-    myString(magZ, str3);
-  printf("Mag: %s, %s, %s uT\n", str1, str2, str3);
-  printf("Time: %lu ms\n\n", imu.time);
+	myString(q2, str1);
+	myString(q3, str2);
+	printf(", %s, %s\n", str1, str2);
+
+	myString(imu.roll, str1);
+	myString(imu.pitch, str2);
+	printf("R/P/Y: %s, %s", str1, str2);
+	myString(imu.yaw, str1);
+	myString(imu.time, str2);
+	printf(", %s\nTime: %s ms\n\n", str1, str2);
 }
 
 void loop()
 {
-  // dataReady() checks to see if new accel/gyro data
-  // is available. It will return a boolean true or false
-  // (New magnetometer data cannot be checked, as the library
-  //  runs that sensor in single-conversion mode.)
-  if ( imu.dataReady() )
-  {
-    // Call update() to update the imu objects sensor data.
-    // You can specify which sensors to update by combining
-    // UPDATE_ACCEL, UPDATE_GYRO, UPDATE_COMPASS, and/or
-    // UPDATE_TEMPERATURE.
-    // (The update function defaults to accel, gyro, compass,
-    //  so you don't have to specify these values.)
-    imu.update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS);
-    printIMUData();
-  }
+	// Check for new data in the FIFO
+	if ( imu.fifoAvailable() )
+	{
+		// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
+		if ( imu.dmpUpdateFifo() == INV_SUCCESS)
+		{
+			// computeEulerAngles can be used -- after updating the
+			// quaternion values -- to estimate roll, pitch, and yaw
+			imu.computeEulerAngles();
+			printIMUData();
+		}
+	}
 }
 
 // Include the Invensense MPU9250 driver and DMP keys:
