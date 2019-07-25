@@ -48,9 +48,6 @@ inv_error_t MPU9250_DMP::begin(void)
 	inv_error_t result;
     struct int_param_s int_param;
 	
-	// Set CS pin
-//TODO
-	
 	result = mpu_init(&int_param);
 	
 	if (result)
@@ -63,8 +60,6 @@ inv_error_t MPU9250_DMP::begin(void)
 	_gSense = getGyroSens();
 	_aSense = getAccelSens();
 	
-	// Set CS pin
-//TODO
 	return result;
 }
 
@@ -210,10 +205,10 @@ float MPU9250_DMP::getGyroSens(void)
 	return 0;
 }
 	
-unsigned short MPU9250_DMP::getAccelSens(void)
+short MPU9250_DMP::getAccelSens(void)
 {
-	unsigned short sens;
-	if (mpu_get_accel_sens(&sens) == INV_SUCCESS)
+	short sens;
+	if (mpu_get_accel_sens((unsigned short*)&sens) == INV_SUCCESS)
 	{
 		return sens;
 	}

@@ -90,12 +90,12 @@ void setup()
   // INV_XYZ_GYRO, INV_XYZ_ACCEL, INV_XYZ_COMPASS,
   // INV_X_GYRO, INV_Y_GYRO, or INV_Z_GYRO
   // Enable all sensors:
-  imu.setSensors(INV_XYZ_ACCEL);
+  imu.setSensors(INV_XYZ_ACCEL | INV_XYZ_GYRO | INV_XYZ_COMPASS);
 
   // Use setGyroFSR() and setAccelFSR() to configure the
   // gyroscope and accelerometer full scale ranges.
   // Gyro options are +/- 250, 500, 1000, or 2000 dps
-//  imu.setGyroFSR(2000); // Set gyro to 2000 dps
+  imu.setGyroFSR(500); // Set gyro to 2000 dps
   // Accel options are +/- 2, 4, 8, or 16 g
   imu.setAccelFSR(2); // Set accel to +/-2g
   // Note: the MPU-9250's magnetometer FSR is set at
@@ -105,18 +105,19 @@ void setup()
   // of the accelerometer and gyroscope.
   // Can be any of the following: 188, 98, 42, 20, 10, 5
   // (values are in Hz).
-  imu.setLPF(5); // Set LPF corner frequency to 5Hz
+  imu.setLPF(10); // Set LPF corner frequency to 5Hz
 
   // The sample rate of the accel/gyro can be set using
   // setSampleRate. Acceptable values range from 4Hz to 1kHz
-  imu.setSampleRate(10); // Set sample rate to 10Hz
+  imu.setSampleRate(4); // Set sample rate to 10Hz
 
   // Likewise, the compass (magnetometer) sample rate can be
   // set using the setCompassSampleRate() function.
   // This value can range between: 1-100Hz
-  imu.setCompassSampleRate(10); // Set mag rate to 10Hz
+  imu.setCompassSampleRate(4); // Set mag rate to 10Hz
 }
 
+#include <cmath>
 // prints a number with 2 digits following the decimal place
 // creates the string backwards, before printing it character-by-character from
 // the end to the start
@@ -125,26 +126,55 @@ void setup()
 //  Output: 270.45
 void myString(float fVal, char *string)
 {
-    int dVal, dec, i;
+    int16_t dVal;
+    uint16_t dec;
+	int8_t i;
+    char backString[20];
 
-    fVal += 0.005;   // added after a comment from Matt McNabb, see below.
+    fVal += 0.0005;   // added after a comment from Matt McNabb, see below.
 
     dVal = fVal;
-    dec = (int)(fVal * 100) % 100;
+    dVal = abs(dVal);
 
-    string[0] = (dec % 10) + '0';
-    string[1] = (dec / 10) + '0';
-    string[2] = '.';
-
-    i = 3;
-    while (dVal > 0)
     {
-    	string[i] = (dVal % 10) + '0';
-        dVal /= 10;
-        i++;
+    	float tempDec = (float)fabs(fVal) * 1000.0f;
+    	dec = (uint16_t)((uint32_t)(tempDec) % 1000);
     }
 
-    string[i] = '\0';
+    backString[0] = (dec % 10) + '0';
+    dec /= 10;
+    backString[1] = (dec % 10) + '0';
+    backString[2] = (dec / 10) + '0';
+    backString[3] = '.';
+
+    i = 4;
+    if(dVal == 0)
+    {
+    	backString[i] = '0';
+    	i++;
+    }
+    else
+		while (dVal > 0)
+		{
+			backString[i] = (dVal % 10) + '0';
+			dVal /= 10;
+			i++;
+		}
+
+    if(fVal < 0.0f)
+    {
+    	backString[i] = '-';
+    	i++;
+    }
+
+    --i;
+    uint8_t k;
+    for(k = 0u; i >= 0; k++, i--)
+    {
+    	string[k] = backString[i];
+    }
+
+    string[k] = '\0';
 }
 
 void printIMUData(void)
@@ -166,7 +196,7 @@ void printIMUData(void)
   float magY = imu.calcMag(imu.my);
   float magZ = imu.calcMag(imu.mz);
 
-  char str1[20], str2[20], str3[30];
+  char str1[20], str2[20], str3[20];
 
   printf("Accel: %d g\n", imu.ax);
   myString(accelX, str1);
@@ -198,9 +228,25 @@ void loop()
     // UPDATE_TEMPERATURE.
     // (The update function defaults to accel, gyro, compass,
     //  so you don't have to specify these values.)
-    imu.update(UPDATE_ACCEL);// | UPDATE_GYRO | UPDATE_COMPASS);
+    imu.update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS);
     printIMUData();
   }
+}
+
+// Include the Invensense MPU9250 driver and DMP keys:
+extern "C" {
+#include "stm32_mpu9250_spi.h"
+}
+
+void test_whoAmI()
+{
+	uint8_t readData[5] = {0};
+	if(spi_read(0u, 0x75u, 4u, readData))
+		printf("Check error\n");
+	else if(readData[0] == 0x71)
+		printf("Supi!\n");
+	else
+		printf("ID matching error\n");
 }
 
 /* USER CODE END 0 */
@@ -252,16 +298,11 @@ int main(void)
 	  HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
 
 	  loop();
-	  printIMUData();
-	  HAL_Delay(50);
+//	  printIMUData();
+	  HAL_Delay(125);
 	  HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
-	  HAL_Delay(50);
-
-//	  chars[0] += (uint8_t)1u;
-//	  if(chars[0] >'z')
-//		  chars[0] = 'a';
-//
-//	  printf("%s", chars);
+	  HAL_Delay(125);
+//	  test_whoAmI();
 
     /* USER CODE END WHILE */
 
@@ -388,7 +429,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.Mode = SPI_MODE_MASTER;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
   hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;

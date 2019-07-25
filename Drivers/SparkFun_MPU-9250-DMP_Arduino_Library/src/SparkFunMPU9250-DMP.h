@@ -119,7 +119,7 @@ public:
 	// getAccelSens -- Returns current accelerometer sensitivity. The FSR 
 	// divided by the resolution of the sensor (signed 16-bit).
 	// Output: Currently set accel sensitivity (e.g. 16384, 8192, 4096, 2048)
-	unsigned short getAccelSens(void);
+	short getAccelSens(void);
 	
 	// getMagFSR -- Returns the current magnetometer FSR
 	// Output: Current mag uT range - +/-1450 uT
@@ -373,7 +373,7 @@ public:
 	int selfTest(unsigned char debug = 0);
 	
 private:
-	unsigned short _aSense;
+	short _aSense;
 	float _gSense, _mSense;
 	
 	// Convert a QN-format number to a float

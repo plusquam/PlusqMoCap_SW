@@ -13,8 +13,8 @@
 #define SPI 1
 
 #ifdef SPI
-uint8_t spi_write( unsigned char slave_addr, unsigned char reg_addr, unsigned char length, unsigned char *data );
-uint8_t spi_read( unsigned char slave_addr, unsigned char reg_addr, unsigned char length, unsigned char *data );
+extern uint8_t spi_write( unsigned char slave_addr, unsigned char reg_addr, unsigned char length, unsigned char *data );
+extern uint8_t spi_read( unsigned char slave_addr, unsigned char reg_addr, unsigned char length, unsigned char *data );
 #define i2c_write(a, b, c, d) spi_write(a, b, c, d)
 #define i2c_read(a, b, c, d)  spi_read(a, b, c, d)
 #else

@@ -17,42 +17,12 @@ static void delay_us(uint8_t microseconds)
 	{
 		uint16_t counter;
 		const uint16_t limit = microseconds * CORE_FREQ_MHZ / 7u; // approximate number of cpu cycles per one for iteration
-		for( counter = 0u; counter < limit; ++counter)
+		for( counter = 17u; counter < limit; ++counter)
 		{
 			;
 		}
 	}
 }
-
-/**
- * Send a byte-array of data through SPI bus (blocking)
- * @param I2Caddress (NOT USED) Here for compatibility with I2C HAL implementation
- * @param regAddress Address of a first register in MPU to start writing into
- * @param data Buffer of data to send
- * @param length Length of data to send
- * @return 0 to verify that function didn't hang somewhere
- */
-//uint8_t HAL_MPU_WriteBytes(uint8_t I2Caddress, uint8_t regAddress,
-//                           uint16_t length, uint8_t *data)
-//{
-//    uint16_t i;
-//    uint32_t dummy[1];
-//
-//    regAddress = regAddress & 0x7F; //  MSB = 0 for writing operation
-//    MAP_GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_2, 0x00);
-//    HAL_DelayUS(1);
-//    SSIDataPut(SSI2_BASE, regAddress);
-//
-//    for (i = 0; i < length; i++)
-//        SSIDataPut(SSI2_BASE, data[i]);
-//
-//    while(SSIBusy(SSI2_BASE));
-//    MAP_GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_2, 0xFF);
-//
-//    while (SSIDataGetNonBlocking(SSI2_BASE, &dummy[0]));
-//
-//    return 0;
-//}
 
 static inline uint8_t spi_write_register(uint8_t reg_addr, uint8_t * data, uint8_t length)
 {
@@ -120,7 +90,7 @@ uint8_t spi_write( uint8_t slave_addr, uint8_t reg_addr, uint8_t length, uint8_t
             returnVal |= spi_write_register( MPU9250_I2C_SLV4_DO, &(data[i]), 1 );
             byte = 0x80;
             returnVal |= spi_write_register( MPU9250_I2C_SLV4_CTRL, &byte, 1 );
-            HAL_Delay(20u);
+            HAL_Delay(10u);
         }
     }
     else
@@ -146,16 +116,15 @@ uint8_t spi_read( uint8_t slave_addr, uint8_t reg_addr, uint8_t length, uint8_t 
         {
             byte = reg_addr + i;
             returnVal |= spi_write_register( MPU9250_I2C_SLV4_REG, &byte, 1 );
-//            spi_write_register( MPU9250_I2C_SLV4_DO, &(data[i]), 1 );
             byte = 0x80;
             returnVal |= spi_write_register( MPU9250_I2C_SLV4_CTRL, &byte, 1 );
-            HAL_Delay(20u);
+            HAL_Delay(10u);
             returnVal |= spi_read_register( MPU9250_I2C_SLV4_DI, &(data[i]), 1 );
         }
     }
     else
     {
-    	returnVal |= spi_read_register( reg_addr, (uint8_t *)data, length );
+    	returnVal |= spi_read_register( reg_addr, data, length );
     }
 
     return returnVal;
