@@ -97,7 +97,7 @@ void setup()
   // Gyro options are +/- 250, 500, 1000, or 2000 dps
   imu.setGyroFSR(500); // Set gyro to 2000 dps
   // Accel options are +/- 2, 4, 8, or 16 g
-  imu.setAccelFSR(2); // Set accel to +/-2g
+  imu.setAccelFSR(4); // Set accel to +/-2g
   // Note: the MPU-9250's magnetometer FSR is set at
   // +/- 4912 uT (micro-tesla's)
 
@@ -196,9 +196,9 @@ void printIMUData(void)
   float magY = imu.calcMag(imu.my);
   float magZ = imu.calcMag(imu.mz);
 
-  char str1[20], str2[20], str3[20];
+  char str1[10], str2[10], str3[10];
 
-  printf("Accel: %d g\n", imu.ax);
+//  printf("Accel: %d g\n", imu.ax);
   myString(accelX, str1);
   myString(accelY, str2);
   myString(accelZ, str3);
@@ -284,11 +284,10 @@ int main(void)
   MX_SPI1_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
-//  uint8_t chars[] = "ca\n";
 
   setup();
 
-
+//  test_whoAmI();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -296,13 +295,10 @@ int main(void)
   while (1)
   {
 	  HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
-
-	  loop();
-//	  printIMUData();
 	  HAL_Delay(125);
 	  HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
 	  HAL_Delay(125);
-//	  test_whoAmI();
+	  loop();
 
     /* USER CODE END WHILE */
 

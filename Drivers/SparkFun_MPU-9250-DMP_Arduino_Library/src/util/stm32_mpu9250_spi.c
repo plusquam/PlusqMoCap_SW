@@ -90,7 +90,7 @@ uint8_t spi_write( uint8_t slave_addr, uint8_t reg_addr, uint8_t length, uint8_t
             returnVal |= spi_write_register( MPU9250_I2C_SLV4_DO, &(data[i]), 1 );
             byte = 0x80;
             returnVal |= spi_write_register( MPU9250_I2C_SLV4_CTRL, &byte, 1 );
-            HAL_Delay(10u);
+            HAL_Delay(20u);
         }
     }
     else
@@ -118,7 +118,7 @@ uint8_t spi_read( uint8_t slave_addr, uint8_t reg_addr, uint8_t length, uint8_t 
             returnVal |= spi_write_register( MPU9250_I2C_SLV4_REG, &byte, 1 );
             byte = 0x80;
             returnVal |= spi_write_register( MPU9250_I2C_SLV4_CTRL, &byte, 1 );
-            HAL_Delay(10u);
+            HAL_Delay(20u);
             returnVal |= spi_read_register( MPU9250_I2C_SLV4_DI, &(data[i]), 1 );
         }
     }

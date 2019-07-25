@@ -1613,8 +1613,6 @@ int mpu_set_sensors(unsigned char sensors)
     /* Enable/disable I2C master mode. */
     if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &user_ctrl))
         return -1;
-    uint8_t test = 0;
-    i2c_read(st.hw->addr, st.reg->user_ctrl, 1, &test);
 #endif
 #endif
 
