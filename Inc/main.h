@@ -90,7 +90,7 @@ void Error_Handler(void);
 #define STLINK_TX_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
-extern SPI_HandleTypeDef hspi1;
+//SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart1;
 
 /* USER CODE END Private defines */

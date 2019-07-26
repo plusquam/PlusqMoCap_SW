@@ -1747,25 +1747,34 @@ int mpu_read_fifo_stream(unsigned short length, unsigned char *data,
     if (!st.chip_cfg.sensors)
         return -1;
 
-    if (i2c_read(st.hw->addr, st.reg->fifo_count_h, 2, tmp))
-        return -1;
+    if (i2c_read(st.hw->addr, st.reg->fifo_count_h, 2, tmp)) {
+    	log_e("Read err1\n");
+    	return -1;
+    }
     fifo_count = (tmp[0] << 8) | tmp[1];
     if (fifo_count < length) {
         more[0] = 0;
-        return -1;
+//        log_i("To less data for packet\n");
+        return -3;
     }
     if (fifo_count > (st.hw->max_fifo >> 1)) {
         /* FIFO is 50% full, better check overflow bit. */
         if (i2c_read(st.hw->addr, st.reg->int_status, 1, tmp))
+        {
+        	log_e("Read err2\n");
             return -1;
+        }
         if (tmp[0] & BIT_FIFO_OVERFLOW) {
             mpu_reset_fifo();
+            log_i("Fifo overflow\n");
             return -2;
         }
     }
 
-    if (i2c_read(st.hw->addr, st.reg->fifo_r_w, length, data))
-        return -1;
+    if (i2c_read(st.hw->addr, st.reg->fifo_r_w, length, data)) {
+    	log_e("Read err3\n");
+    	return -1;
+    }
     more[0] = fifo_count / length - 1;
     return 0;
 }

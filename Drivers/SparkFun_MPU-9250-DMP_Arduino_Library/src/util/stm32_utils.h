@@ -21,4 +21,6 @@ int getMsWrapper(unsigned long *count);
 #define log_i     printf
 #define log_e     printf
 
+extern void ftoa(float fVal, char *string);
+
 #endif /* SPARKFUN_MPU_9250_DMP_ARDUINO_LIBRARY_SRC_UTIL_STM32_UTILS_H_ */

@@ -5,11 +5,16 @@
  *      Author: plusq
  */
 #include "stm32_mpu9250_spi.h"
+
+#ifdef SPI
 #include "MPU9250_RegisterMap.h"
 #include "stm32_utils.h"
-#include "main.h"
 
 #define CORE_FREQ_MHZ 64u
+
+static SPI_HandleTypeDef *spi_handler;
+static uint16_t current_CS_pin;
+static GPIO_TypeDef *current_CS_port = NULL;
 
 static void delay_us(uint8_t microseconds)
 {
@@ -24,19 +29,37 @@ static void delay_us(uint8_t microseconds)
 	}
 }
 
+void set_spi_handler(SPI_HandleTypeDef *handler)
+{
+	spi_handler = handler;
+}
+
+void set_CS_portpin(GPIO_TypeDef *port, uint16_t pin)
+{
+	if(current_CS_port != NULL) HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_SET);
+	current_CS_port = port;
+	current_CS_pin = pin;
+}
+
+void get_CS_portpin(GPIO_TypeDef *port, uint16_t *pin)
+{
+	port = current_CS_port;
+	*pin = current_CS_pin;
+}
+
 static inline uint8_t spi_write_register(uint8_t reg_addr, uint8_t * data, uint8_t length)
 {
 	uint8_t returnVal = 0u;
 	reg_addr &= 0x7F; //  MSB = 0 for writing operation
 
-	HAL_GPIO_WritePin(SPI1_CS_0_GPIO_Port, SPI1_CS_0_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_RESET);
 	delay_us(1);
 
-	returnVal |= HAL_SPI_Transmit(&hspi1, &reg_addr, 1u, 2u);
+	returnVal |= HAL_SPI_Transmit(spi_handler, &reg_addr, 1u, 2u);
 	if(!returnVal)
-		returnVal |= HAL_SPI_Transmit(&hspi1, data, length, 1u * length);
+		returnVal |= HAL_SPI_Transmit(spi_handler, data, length, 1u * length);
 
-	HAL_GPIO_WritePin(SPI1_CS_0_GPIO_Port, SPI1_CS_0_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_SET);
 
 	if(returnVal)
 		printf("SPI write error!");
@@ -51,14 +74,14 @@ static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_
 	{
 		reg_addr |= 0x80; //  MSB = 1 for reading operation
 
-		HAL_GPIO_WritePin(SPI1_CS_0_GPIO_Port, SPI1_CS_0_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_RESET);
 		uint8_t dummy_buffer[30] = {0};
 		delay_us(1);
-		returnVal |= HAL_SPI_Transmit(&hspi1, &reg_addr, 1u, 2u);
+		returnVal |= HAL_SPI_Transmit(spi_handler, &reg_addr, 1u, 2u);
 		if(!returnVal)
-			returnVal |= HAL_SPI_TransmitReceive(&hspi1, dummy_buffer, data, length, 1u * length);
+			returnVal |= HAL_SPI_TransmitReceive(spi_handler, dummy_buffer, data, length, 1u * length);
 
-		HAL_GPIO_WritePin(SPI1_CS_0_GPIO_Port, SPI1_CS_0_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_SET);
 	}
 	else
 	{
@@ -129,3 +152,4 @@ uint8_t spi_read( uint8_t slave_addr, uint8_t reg_addr, uint8_t length, uint8_t 
 
     return returnVal;
 }
+#endif

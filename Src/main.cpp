@@ -24,18 +24,28 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <SparkFunMPU9250-DMP.h>
+extern "C" {
+#include "stm32_mpu9250_spi.h"
 #include "stm32_utils.h"
+}
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+typedef struct
+{
+	uint8_t			number;
+	GPIO_TypeDef 	*port;
+	uint16_t 		pin;
+} SpiSlaveHandler_t;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define DMP_SAMPLE_RATE 200
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -52,6 +62,13 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 
+SpiSlaveHandler_t spiSlavesArray[] =
+{
+	[0] = {.number = 0, .port = SPI1_CS_0_GPIO_Port, .pin = SPI1_CS_0_Pin},
+	[1] = {.number = 1, .port = SPI1_CS_1_GPIO_Port, .pin = SPI1_CS_1_Pin},
+	[2] = {.number = 2, .port = SPI1_CS_2_GPIO_Port, .pin = SPI1_CS_2_Pin}
+};
+#define NUMBER_OF_SENSORS (sizeof(spiSlavesArray)/sizeof(SpiSlaveHandler_t))
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -62,140 +79,16 @@ static void MX_SPI1_Init(void);
 static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 
+MPU9250_DMP imu;
+void setup();
+void printIMUData(uint8_t sensor_number);
+void loop();
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-MPU9250_DMP imu;
-
-void setup()
-{
-	// Call imu.begin() to verify communication and initialize
-	if (imu.begin() != INV_SUCCESS)
-	{
-		while (1)
-		{
-			printf("Unable to communicate with MPU-9250\n");
-			printf("Check connections, and try again.\n");
-			HAL_Delay(5000);
-		}
-	}
-
-	imu.dmpBegin(	DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
-					DMP_FEATURE_GYRO_CAL, // Use gyro calibration
-					10); // Set DMP FIFO rate to 10 Hz
-	// DMP_FEATURE_LP_QUAT can also be used. It uses the
-	// accelerometer in low-power mode to estimate quat's.
-	// DMP_FEATURE_LP_QUAT and 6X_LP_QUAT are mutually exclusive
-}
-
-#include <cmath>
-// prints a number with 2 digits following the decimal place
-// creates the string backwards, before printing it character-by-character from
-// the end to the start
-//
-// Usage: myPrintf(270.458)
-//  Output: 270.45
-void myString(float fVal, char *string)
-{
-    int16_t dVal;
-    uint16_t dec;
-	int8_t i;
-    char backString[20];
-
-    fVal += 0.0005;   // added after a comment from Matt McNabb, see below.
-
-    dVal = fVal;
-    dVal = abs(dVal);
-
-    {
-    	float tempDec = (float)fabs(fVal) * 1000.0f;
-    	dec = (uint16_t)((uint32_t)(tempDec) % 1000);
-    }
-
-    backString[0] = (dec % 10) + '0';
-    dec /= 10;
-    backString[1] = (dec % 10) + '0';
-    backString[2] = (dec / 10) + '0';
-    backString[3] = '.';
-
-    i = 4;
-    if(dVal == 0)
-    {
-    	backString[i] = '0';
-    	i++;
-    }
-    else
-		while (dVal > 0)
-		{
-			backString[i] = (dVal % 10) + '0';
-			dVal /= 10;
-			i++;
-		}
-
-    if(fVal < 0.0f)
-    {
-    	backString[i] = '-';
-    	i++;
-    }
-
-    --i;
-    uint8_t k;
-    for(k = 0u; i >= 0; k++, i--)
-    {
-    	string[k] = backString[i];
-    }
-
-    string[k] = '\0';
-}
-
-void printIMUData(void)
-{
-	char str1[10], str2[10];
-
-	// After calling dmpUpdateFifo() the ax, gx, mx, etc. values
-	// are all updated.
-	// Quaternion values are, by default, stored in Q30 long
-	// format. calcQuat turns them into a float between -1 and 1
-	float q0 = imu.calcQuat(imu.qw);
-	float q1 = imu.calcQuat(imu.qx);
-	float q2 = imu.calcQuat(imu.qy);
-	float q3 = imu.calcQuat(imu.qz);
-
-	myString(q0, str1);
-	myString(q1, str2);
-	printf("Q: %s, %s", str1, str2);
-
-	myString(q2, str1);
-	myString(q3, str2);
-	printf(", %s, %s\n", str1, str2);
-
-	myString(imu.roll, str1);
-	myString(imu.pitch, str2);
-	printf("R/P/Y: %s, %s", str1, str2);
-	myString(imu.yaw, str1);
-	myString(imu.time, str2);
-	printf(", %s\nTime: %s ms\n\n", str1, str2);
-}
-
-void loop()
-{
-	// Check for new data in the FIFO
-	if ( imu.fifoAvailable() )
-	{
-		// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
-		if ( imu.dmpUpdateFifo() == INV_SUCCESS)
-		{
-			// computeEulerAngles can be used -- after updating the
-			// quaternion values -- to estimate roll, pitch, and yaw
-			imu.computeEulerAngles();
-			printIMUData();
-		}
-	}
-}
-
-// Include the Invensense MPU9250 driver and DMP keys:
 extern "C" {
 #include "stm32_mpu9250_spi.h"
 }
@@ -247,20 +140,56 @@ int main(void)
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 
-  setup();
+  set_spi_handler(&hspi1);
 
-//  test_whoAmI();
+  for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+  {
+	  set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+	  setup();
+  }
+
+  uint8_t numOfIters = 0u;
+  constexpr uint8_t numOfItersToPrint = DMP_SAMPLE_RATE; // value set for 1Hz printf refresh rate
+  GPIO_PinState ledState = GPIO_PIN_RESET;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET);
-	  HAL_Delay(125);
-	  HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
-	  HAL_Delay(125);
-	  loop();
+	numOfIters++;
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		// Check for new data in the FIFO
+		if (i == 0 )
+			while(!imu.fifoAvailable())
+			{
+				delay_ms(1);
+			}
+
+		// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
+		if ( imu.dmpUpdateFifo() == INV_SUCCESS)
+		{
+			// computeEulerAngles can be used -- after updating the
+			// quaternion values -- to estimate roll, pitch, and yaw
+			imu.computeEulerAngles();
+		}
+		else
+		{
+			printf("DMP update fifo read error\n");
+		}
+
+		if(numOfIters >= numOfItersToPrint)
+			printIMUData(i);
+	}
+
+	if(numOfIters >= numOfItersToPrint) {
+		ledState = (GPIO_PinState)!ledState;
+		HAL_GPIO_WritePin(GPIOB, LD1_Pin, ledState);
+		numOfIters = 0u;
+		printf("\n");
+	}
 
     /* USER CODE END WHILE */
 
@@ -513,6 +442,79 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void setup()
+{
+	// Call imu.begin() to verify communication and initialize
+	if (imu.begin() != INV_SUCCESS)
+	{
+		while (1)
+		{
+			printf("Unable to communicate with MPU-9250\n");
+			printf("Check connections, and try again.\n");
+			HAL_Delay(5000);
+		}
+	}
+
+	imu.dmpBegin(	DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
+					DMP_FEATURE_GYRO_CAL, // Use gyro calibration
+					DMP_SAMPLE_RATE); // Set DMP FIFO rate to 10 Hz
+	// DMP_FEATURE_LP_QUAT can also be used. It uses the
+	// accelerometer in low-power mode to estimate quat's.
+	// DMP_FEATURE_LP_QUAT and 6X_LP_QUAT are mutually exclusive
+}
+
+void printIMUData(uint8_t sensor_number)
+{
+	char str1[10], str2[10];
+
+	// After calling dmpUpdateFifo() the ax, gx, mx, etc. values
+	// are all updated.
+	// Quaternion values are, by default, stored in Q30 long
+	// format. calcQuat turns them into a float between -1 and 1
+	float q0 = imu.calcQuat(imu.qw);
+	float q1 = imu.calcQuat(imu.qx);
+	float q2 = imu.calcQuat(imu.qy);
+	float q3 = imu.calcQuat(imu.qz);
+
+	ftoa(q0, str1);
+	ftoa(q1, str2);
+	printf("Sensor: %d\n", sensor_number);
+	printf("Q: %s, %s", str1, str2);
+
+	ftoa(q2, str1);
+	ftoa(q3, str2);
+	printf(", %s, %s\n", str1, str2);
+
+	ftoa(imu.roll, str1);
+	ftoa(imu.pitch, str2);
+	printf("R/P/Y: %s, %s", str1, str2);
+	ftoa(imu.yaw, str1);
+	printf(", %s\nTime: %lu ms\n", str1, imu.time);
+}
+
+void loop()
+{
+	// Check for new data in the FIFO
+	if ( !imu.fifoAvailable() )
+	{
+//	{
+//		delay_ms(1);
+//	}
+		// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
+		if ( imu.dmpUpdateFifo() == INV_SUCCESS)
+		{
+			// computeEulerAngles can be used -- after updating the
+			// quaternion values -- to estimate roll, pitch, and yaw
+			imu.computeEulerAngles();
+		}
+		else
+		{
+			printf("DMP update fifo read error\n");
+		}
+	}
+
+}
 
 /* USER CODE END 4 */
 
