@@ -79,7 +79,7 @@ static void MX_SPI1_Init(void);
 static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 
-MPU9250_DMP imu;
+MPU9250_DMP IMUs[NUMBER_OF_SENSORS];
 void setup();
 void printIMUData(uint8_t sensor_number);
 void loop();
@@ -89,20 +89,7 @@ void loop();
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-extern "C" {
-#include "stm32_mpu9250_spi.h"
-}
-
-void test_whoAmI()
-{
-	uint8_t readData[5] = {0};
-	if(spi_read(0u, 0x75u, 4u, readData))
-		printf("Check error\n");
-	else if(readData[0] == 0x71)
-		printf("Supi!\n");
-	else
-		printf("ID matching error\n");
-}
+bool test_whoAmI();
 
 /* USER CODE END 0 */
 
@@ -142,15 +129,68 @@ int main(void)
 
   set_spi_handler(&hspi1);
 
+  ///////////////// SENSOR CHECK ///////////////////////
   for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
   {
 	  set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-	  setup();
+	  if(!test_whoAmI())
+		  while(1)
+		  {
+			  // Sensor check fail
+			  printf("Sensor check fail! Try again.\n");
+			  delay_ms(1000);
+		  }
   }
+  printf("Sensor check passed.\n");
 
+  ////////////////// MEASUREMENT START //////////////////////
+  printf("Press SW1 to start.\n");
+  while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin))
+  {
+	  delay_ms(100);
+  }
+  printf("Measurement start.\n");
+
+  ////////////////// SETUP /////////////////////////////
+  for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+  {
+	set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+	// Call IMUs[i].begin() to verify communication and initialize
+	if (IMUs[i].begin() != INV_SUCCESS)
+	{
+		while (1)
+		{
+			printf("Unable to communicate with MPU-9250\n");
+			printf("Check connections, and try again.\n");
+			HAL_Delay(5000);
+		}
+	}
+
+	IMUs[i].dmpBegin(	DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
+						DMP_FEATURE_GYRO_CAL, // Use gyro calibration
+						DMP_SAMPLE_RATE); // Set DMP FIFO rate to 10 Hz
+						// DMP_FEATURE_LP_QUAT can also be used. It uses the
+						// accelerometer in low-power mode to estimate quat's.
+						// DMP_FEATURE_LP_QUAT and 6X_LP_QUAT are mutually exclusive
+  }
+  printf("Setup done.\n");
+
+  ////////////////// RESET FIFO /////////////////////////////
+  for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+  {
+	set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+	IMUs[i].resetFifo();
+  }
+  printf("Fifo reset done.\n");
+
+  ////////////////// RESET SYSTICK /////////////////////////
+  __disable_irq();
+  uwTick = 0lu;
+  __enable_irq();
+
+  ////////////////// LOOP START ///////////////////////////
   uint8_t numOfIters = 0u;
   constexpr uint8_t numOfItersToPrint = DMP_SAMPLE_RATE; // value set for 1Hz printf refresh rate
-  GPIO_PinState ledState = GPIO_PIN_RESET;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -163,21 +203,21 @@ int main(void)
 		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
 		// Check for new data in the FIFO
 		if (i == 0 )
-			while(!imu.fifoAvailable())
+			while(!IMUs[i].fifoAvailable())
 			{
 				delay_ms(1);
 			}
 
 		// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
-		if ( imu.dmpUpdateFifo() == INV_SUCCESS)
+		if ( IMUs[i].dmpUpdateFifo() == INV_SUCCESS)
 		{
 			// computeEulerAngles can be used -- after updating the
 			// quaternion values -- to estimate roll, pitch, and yaw
-			imu.computeEulerAngles();
+//			IMUs[i].computeEulerAngles();
 		}
 		else
 		{
-			printf("DMP update fifo read error\n");
+			printf("DMP update fifo read error!\n");
 		}
 
 		if(numOfIters >= numOfItersToPrint)
@@ -185,8 +225,7 @@ int main(void)
 	}
 
 	if(numOfIters >= numOfItersToPrint) {
-		ledState = (GPIO_PinState)!ledState;
-		HAL_GPIO_WritePin(GPIOB, LD1_Pin, ledState);
+		HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
 		numOfIters = 0u;
 		printf("\n");
 	}
@@ -415,7 +454,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LD2_Pin LD3_Pin LD1_Pin */
@@ -442,28 +481,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-void setup()
-{
-	// Call imu.begin() to verify communication and initialize
-	if (imu.begin() != INV_SUCCESS)
-	{
-		while (1)
-		{
-			printf("Unable to communicate with MPU-9250\n");
-			printf("Check connections, and try again.\n");
-			HAL_Delay(5000);
-		}
-	}
-
-	imu.dmpBegin(	DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
-					DMP_FEATURE_GYRO_CAL, // Use gyro calibration
-					DMP_SAMPLE_RATE); // Set DMP FIFO rate to 10 Hz
-	// DMP_FEATURE_LP_QUAT can also be used. It uses the
-	// accelerometer in low-power mode to estimate quat's.
-	// DMP_FEATURE_LP_QUAT and 6X_LP_QUAT are mutually exclusive
-}
-
 void printIMUData(uint8_t sensor_number)
 {
 	char str1[10], str2[10];
@@ -472,48 +489,48 @@ void printIMUData(uint8_t sensor_number)
 	// are all updated.
 	// Quaternion values are, by default, stored in Q30 long
 	// format. calcQuat turns them into a float between -1 and 1
-	float q0 = imu.calcQuat(imu.qw);
-	float q1 = imu.calcQuat(imu.qx);
-	float q2 = imu.calcQuat(imu.qy);
-	float q3 = imu.calcQuat(imu.qz);
+	float q0 = IMUs[sensor_number].calcQuat(IMUs[sensor_number].qw);
+	float q1 = IMUs[sensor_number].calcQuat(IMUs[sensor_number].qx);
+	float q2 = IMUs[sensor_number].calcQuat(IMUs[sensor_number].qy);
+	float q3 = IMUs[sensor_number].calcQuat(IMUs[sensor_number].qz);
 
+	// Quaternions
 	ftoa(q0, str1);
 	ftoa(q1, str2);
 	printf("Sensor: %d\n", sensor_number);
 	printf("Q: %s, %s", str1, str2);
-
 	ftoa(q2, str1);
 	ftoa(q3, str2);
 	printf(", %s, %s\n", str1, str2);
 
-	ftoa(imu.roll, str1);
-	ftoa(imu.pitch, str2);
-	printf("R/P/Y: %s, %s", str1, str2);
-	ftoa(imu.yaw, str1);
-	printf(", %s\nTime: %lu ms\n", str1, imu.time);
+	// Euler angles
+//	ftoa(IMUs[sensor_number].roll, str1);
+//	ftoa(IMUs[sensor_number].pitch, str2);
+//	printf("R/P/Y: %s, %s", str1, str2);
+//	ftoa(IMUs[sensor_number].yaw, str1);
+//	printf(", %s\n", str1);
+
+	// Time
+	printf("Time: %lu ms\n", IMUs[sensor_number].time);
 }
 
-void loop()
+extern "C" {
+#include "stm32_mpu9250_spi.h"
+}
+bool test_whoAmI()
 {
-	// Check for new data in the FIFO
-	if ( !imu.fifoAvailable() )
-	{
-//	{
-//		delay_ms(1);
-//	}
-		// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
-		if ( imu.dmpUpdateFifo() == INV_SUCCESS)
-		{
-			// computeEulerAngles can be used -- after updating the
-			// quaternion values -- to estimate roll, pitch, and yaw
-			imu.computeEulerAngles();
-		}
-		else
-		{
-			printf("DMP update fifo read error\n");
-		}
+	uint8_t readData[5] = {0};
+	if(spi_read(0u, 0x75u, 4u, readData)) {
+		printf("Check error\n");
+		return false;
 	}
-
+	else if(readData[0] == 0x71) {
+		return true;
+	}
+	else {
+		printf("ID matching error\n");
+		return false;
+	}
 }
 
 /* USER CODE END 4 */

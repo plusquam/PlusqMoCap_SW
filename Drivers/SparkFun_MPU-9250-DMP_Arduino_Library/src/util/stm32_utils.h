@@ -23,4 +23,8 @@ int getMsWrapper(unsigned long *count);
 
 extern void ftoa(float fVal, char *string);
 
+#ifdef DEBUG
+#define PRINT_COMPILE_SIZE_OF(x) char (*__kaboom)[sizeof( (x) )] = 1;
+#endif
+
 #endif /* SPARKFUN_MPU_9250_DMP_ARDUINO_LIBRARY_SRC_UTIL_STM32_UTILS_H_ */
