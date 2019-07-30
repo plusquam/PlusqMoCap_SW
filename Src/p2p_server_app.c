@@ -69,6 +69,8 @@ PLACE_IN_SECTION("BLE_APP_CONTEXT") static P2P_Server_App_Context_t P2P_Server_A
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
+void P2PS_Send_Notification(void);
+void P2PS_APP_LED_BUTTON_context_Init(void);
 
 /* USER CODE END PFP */
 
@@ -86,13 +88,17 @@ void P2PS_STM_App_Notification(P2PS_STM_App_Notification_evt_t *pNotification)
 
     case P2PS_STM__NOTIFY_ENABLED_EVT:
 /* USER CODE BEGIN P2PS_STM__NOTIFY_ENABLED_EVT */
-
+		P2P_Server_App_Context.Notification_Status = 1;
+		APP_DBG_MSG("-- P2P APPLICATION SERVER : NOTIFICATION ENABLED\n");
+		APP_DBG_MSG(" \n\r");
 /* USER CODE END P2PS_STM__NOTIFY_ENABLED_EVT */
       break;
 
     case P2PS_STM_NOTIFY_DISABLED_EVT:
 /* USER CODE BEGIN P2PS_STM_NOTIFY_DISABLED_EVT */
-
+        P2P_Server_App_Context.Notification_Status = 0;
+        APP_DBG_MSG("-- P2P APPLICATION SERVER : NOTIFICATION DISABLED\n");
+        APP_DBG_MSG(" \n\r");
 /* USER CODE END P2PS_STM_NOTIFY_DISABLED_EVT */
       break;
       
@@ -148,7 +154,7 @@ void P2PS_APP_Notification(P2PS_APP_ConnHandle_Not_evt_t *pNotification)
 
     case PEER_DISCON_HANDLE_EVT :
 /* USER CODE BEGIN PEER_DISCON_HANDLE_EVT */
-
+    	P2PS_APP_LED_BUTTON_context_Init();
 /* USER CODE END PEER_DISCON_HANDLE_EVT */
     break;
     
@@ -167,12 +173,55 @@ void P2PS_APP_Notification(P2PS_APP_ConnHandle_Not_evt_t *pNotification)
 void P2PS_APP_Init(void)
 {
 /* USER CODE BEGIN P2PS_APP_Init */
+	SCH_RegTask( CFG_TASK_SW1_BUTTON_PUSHED_ID, P2PS_Send_Notification );
 
+	/* App Context init */
+	P2P_Server_App_Context.Notification_Status=0;
+	P2PS_APP_LED_BUTTON_context_Init();
 /* USER CODE END P2PS_APP_Init */
   return;
 }
 
 /* USER CODE BEGIN FD */
+void P2PS_APP_LED_BUTTON_context_Init(void){
+
+  #if(P2P_SERVER1 != 0)
+  P2P_Server_App_Context.LedControl.Device_Led_Selection=0x01; /* Device1 */
+  P2P_Server_App_Context.LedControl.Led1=0x00; /* led OFF */
+  P2P_Server_App_Context.ButtonControl.Device_Button_Selection=0x01;/* Device1 */
+  P2P_Server_App_Context.ButtonControl.ButtonStatus=0x00;
+#endif
+#if(P2P_SERVER2 != 0)
+  P2P_Server_App_Context.LedControl.Device_Led_Selection=0x02; /* Device2 */
+  P2P_Server_App_Context.LedControl.Led1=0x00; /* led OFF */
+  P2P_Server_App_Context.ButtonControl.Device_Button_Selection=0x02;/* Device2 */
+  P2P_Server_App_Context.ButtonControl.ButtonStatus=0x00;
+#endif
+#if(P2P_SERVER3 != 0)
+  P2P_Server_App_Context.LedControl.Device_Led_Selection=0x03; /* Device3 */
+  P2P_Server_App_Context.LedControl.Led1=0x00; /* led OFF */
+  P2P_Server_App_Context.ButtonControl.Device_Button_Selection=0x03; /* Device3 */
+  P2P_Server_App_Context.ButtonControl.ButtonStatus=0x00;
+#endif
+#if(P2P_SERVER4 != 0)
+  P2P_Server_App_Context.LedControl.Device_Led_Selection=0x04; /* Device4 */
+  P2P_Server_App_Context.LedControl.Led1=0x00; /* led OFF */
+  P2P_Server_App_Context.ButtonControl.Device_Button_Selection=0x04; /* Device4 */
+  P2P_Server_App_Context.ButtonControl.ButtonStatus=0x00;
+#endif
+ #if(P2P_SERVER5 != 0)
+  P2P_Server_App_Context.LedControl.Device_Led_Selection=0x05; /* Device5 */
+  P2P_Server_App_Context.LedControl.Led1=0x00; /* led OFF */
+  P2P_Server_App_Context.ButtonControl.Device_Button_Selection=0x05; /* Device5 */
+  P2P_Server_App_Context.ButtonControl.ButtonStatus=0x00;
+#endif
+#if(P2P_SERVER6 != 0)
+  P2P_Server_App_Context.LedControl.Device_Led_Selection=0x06; /* device6 */
+  P2P_Server_App_Context.LedControl.Led1=0x00; /* led OFF */
+  P2P_Server_App_Context.ButtonControl.Device_Button_Selection=0x06; /* Device6 */
+  P2P_Server_App_Context.ButtonControl.ButtonStatus=0x00;
+#endif
+}
 
 /* USER CODE END FD */
 
@@ -182,6 +231,25 @@ void P2PS_APP_Init(void)
  *
  *************************************************************/
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
+void P2PS_Send_Notification(void)
+{
+
+  if(P2P_Server_App_Context.ButtonControl.ButtonStatus == 0x00){
+    P2P_Server_App_Context.ButtonControl.ButtonStatus=0x01;
+  } else {
+    P2P_Server_App_Context.ButtonControl.ButtonStatus=0x00;
+  }
+
+   if(P2P_Server_App_Context.Notification_Status){
+    APP_DBG_MSG("-- P2P APPLICATION SERVER  : INFORM CLIENT BUTTON 1 PUSHED \n ");
+    APP_DBG_MSG(" \n\r");
+    P2PS_STM_App_Update_Char(P2P_NOTIFY_CHAR_UUID, (uint8_t *)&P2P_Server_App_Context.ButtonControl);
+   } else {
+    APP_DBG_MSG("-- P2P APPLICATION SERVER : CAN'T INFORM CLIENT -  NOTIFICATION DISABLED\n ");
+   }
+
+  return;
+}
 
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
 
