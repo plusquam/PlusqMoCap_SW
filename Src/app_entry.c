@@ -390,7 +390,7 @@ void DbgOutputInit( void )
   */
 void DbgOutputTraces(  uint8_t *p_data, uint16_t size, void (*cb)(void) )
 {
-  HW_UART_Transmit_DMA(DBG_TRACE_UART_CFG, p_data, size, cb);
+	HW_UART_Transmit_IT(DBG_TRACE_UART_CFG, p_data, size, cb);
 
   return;
 }
