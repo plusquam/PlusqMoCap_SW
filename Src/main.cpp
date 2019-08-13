@@ -131,116 +131,120 @@ int main(void)
   MX_RF_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
-//
-//  set_spi_handler(&hspi1);
-//
-//  ///////////////// SENSOR CHECK ///////////////////////
-//  for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-//  {
-//	  set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-//	  if(!test_whoAmI())
-//		  while(1)
-//		  {
-//			  // Sensor check fail
-//			  printf("Sensor check fail! Try again.\n");
-//			  delay_ms(1000);
-//		  }
-//  }
-//  printf("Sensor check passed.\n");
-//
-//  ////////////////// MEASUREMENT START //////////////////////
-//  printf("Press SW1 to start.\n");
-//  while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin))
-//  {
-//	  delay_ms(100);
-//  }
-//  printf("Measurement start.\n");
-//
-//  ////////////////// SETUP /////////////////////////////
-//  for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-//  {
-//	set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-//	// Call IMUs[i].begin() to verify communication and initialize
-//	if (IMUs[i].begin() != INV_SUCCESS)
-//	{
-//		while (1)
-//		{
-//			printf("Unable to communicate with MPU-9250\n");
-//			printf("Check connections, and try again.\n");
-//			HAL_Delay(5000);
-//		}
-//	}
-//
-//	IMUs[i].dmpBegin(	DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
-//						DMP_FEATURE_GYRO_CAL, // Use gyro calibration
-//						DMP_SAMPLE_RATE); // Set DMP FIFO rate to 10 Hz
-//						// DMP_FEATURE_LP_QUAT can also be used. It uses the
-//						// accelerometer in low-power mode to estimate quat's.
-//						// DMP_FEATURE_LP_QUAT and 6X_LP_QUAT are mutually exclusive
-//  }
-//  printf("Setup done.\n");
-//
-//  ////////////////// RESET FIFO /////////////////////////////
-//  for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-//  {
-//	set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-//	IMUs[i].resetFifo();
-//  }
-//  printf("Fifo reset done.\n");
-//
-//  ////////////////// RESET SYSTICK /////////////////////////
-//  __disable_irq();
-//  uwTick = 0lu;
-//  __enable_irq();
-//
-//  ////////////////// LOOP START ///////////////////////////
-//  uint8_t numOfIters = 0u;
-//  constexpr uint8_t numOfItersToPrint = DMP_SAMPLE_RATE; // value set for 1Hz printf refresh rate
 
   /* USER CODE END 2 */
   APPE_Init();
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  ///////////////// SPI FOR MPU9250 SET ///////////////////////
+  set_spi_handler(&hspi1);
+
+  ///////////////// SENSOR CHECK ///////////////////////
+  for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+  {
+	  set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+	  if(!test_whoAmI())
+		  while(1)
+		  {
+			  // Sensor check fail
+			  printf("Sensor check fail! Try again.\n");
+			  delay_ms(1000);
+		  }
+  }
+  printf("Sensor check passed.\n");
+
+  ////////////////// MEASUREMENT START //////////////////////
+  printf("Press SW1 to start.\n");
+  while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin))
+  {
+	  delay_ms(100);
+  }
+  printf("Measurement start.\n");
+
+  ////////////////// SETUP /////////////////////////////
+  for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+  {
+	set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+	// Call IMUs[i].begin() to verify communication and initialize
+	if (IMUs[i].begin() != INV_SUCCESS)
+	{
+		while (1)
+		{
+			printf("Unable to communicate with MPU-9250\n");
+			printf("Check connections, and try again.\n");
+			HAL_Delay(5000);
+		}
+	}
+
+	IMUs[i].dmpBegin(	DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
+						DMP_FEATURE_GYRO_CAL, // Use gyro calibration
+						DMP_SAMPLE_RATE); // Set DMP FIFO rate to 10 Hz
+						// DMP_FEATURE_LP_QUAT can also be used. It uses the
+						// accelerometer in low-power mode to estimate quat's.
+						// DMP_FEATURE_LP_QUAT and 6X_LP_QUAT are mutually exclusive
+  }
+  printf("Setup done.\n");
+
+  ////////////////// RESET FIFO /////////////////////////////
+  for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+  {
+	set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+	IMUs[i].resetFifo();
+  }
+  printf("Fifo reset done.\n");
+
+  ////////////////// RESET SYSTICK /////////////////////////
+  __disable_irq();
+  uwTick = 0lu;
+  __enable_irq();
+
+  ////////////////// LOOP START ///////////////////////////
+  uint8_t numOfIters = 0u;
+  constexpr uint8_t numOfItersToPrint = DMP_SAMPLE_RATE; // value set for 1Hz printf refresh rate
+
+
   while (1)
   {
-	  SCH_Run(~0);
-//	numOfIters++;
-//	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-//	{
-//		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-//		// Check for new data in the FIFO
-//		if (i == 0 )
-//			while(!IMUs[i].fifoAvailable())
-//			{
-//				delay_ms(1);
-//			}
-//
-//		// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
-//		if ( IMUs[i].dmpUpdateFifo() == INV_SUCCESS)
-//		{
-//			// computeEulerAngles can be used -- after updating the
-//			// quaternion values -- to estimate roll, pitch, and yaw
-////			IMUs[i].computeEulerAngles();
-//		}
-//		else
-//		{
-//			printf("DMP update fifo read error!\n");
-//		}
-//
-//		if(numOfIters >= numOfItersToPrint)
-//			printIMUData(i);
-//	}
-//
-//	if(numOfIters >= numOfItersToPrint) {
-//		HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
-//		numOfIters = 0u;
-//		printf("\n");
-//	}
+
+	numOfIters++;
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		// Check for new data in the FIFO
+		if (i == 0 )
+			while(!IMUs[i].fifoAvailable())
+			{
+				delay_ms(1);
+			}
+
+		// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
+		if ( IMUs[i].dmpUpdateFifo() == INV_SUCCESS)
+		{
+			// computeEulerAngles can be used -- after updating the
+			// quaternion values -- to estimate roll, pitch, and yaw
+//			IMUs[i].computeEulerAngles();
+		}
+		else
+		{
+			printf("DMP update fifo read error!\n");
+		}
+
+		if(numOfIters >= numOfItersToPrint)
+			printIMUData(i);
+	}
+
+	if(numOfIters >= numOfItersToPrint) {
+		HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
+		numOfIters = 0u;
+		printf("\n");
+	}
 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	// Run all tasks
+	SCH_Run(~0);
   }
   /* USER CODE END 3 */
 }
@@ -568,6 +572,24 @@ bool test_whoAmI()
 		printf("ID matching error\n");
 		return false;
 	}
+}
+
+void HAL_Delay(uint32_t Delay)
+{
+  uint32_t tickstart = HAL_GetTick();
+  uint32_t wait = Delay;
+
+  /* Add a freq to guarantee minimum wait */
+  if (wait < HAL_MAX_DELAY)
+  {
+    wait += (uint32_t)(uwTickFreq);
+  }
+
+  while ((HAL_GetTick() - tickstart) < wait)
+  {
+	  // Run all tasks
+	  	SCH_Run(~0);
+  }
 }
 
 /* USER CODE END 4 */
