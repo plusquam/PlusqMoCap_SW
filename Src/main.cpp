@@ -48,7 +48,7 @@ typedef struct
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define DMP_SAMPLE_RATE 200
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -90,6 +90,7 @@ static void MX_RTC_Init(void);
 MPU9250_DMP IMUs[NUMBER_OF_SENSORS];
 void printIMUData(uint8_t sensor_number);
 void readMpuDataCallback(void);
+void SetupMPUSensors(void);
 
 /* USER CODE END PFP */
 
@@ -142,71 +143,17 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  ///////////////// SPI FOR MPU9250 SET ///////////////////////
-  set_spi_handler(&hspi1);
-
-  ///////////////// SENSOR CHECK ///////////////////////
-  for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-  {
-	  set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-	  if(!test_whoAmI())
-		  while(1)
-		  {
-			  // Sensor check fail
-			  printf("Sensor check fail! Try again.\n");
-			  delay_ms(1000);
-		  }
-  }
-  printf("Sensor check passed.\n");
-
-  ////////////////// SETUP /////////////////////////////
-  for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-  {
-	set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-	// Call IMUs[i].begin() to verify communication and initialize
-	if (IMUs[i].begin() != INV_SUCCESS)
-	{
-		while (1)
-		{
-			printf("Unable to communicate with MPU-9250\n");
-			printf("Check connections, and try again.\n");
-			HAL_Delay(5000);
-		}
-	}
-
-	// DMP_FEATURE_LP_QUAT can also be used. It uses the
-	// accelerometer in low-power mode to estimate quat's.
-	// DMP_FEATURE_LP_QUAT and 6X_LP_QUAT are mutually exclusive
-	/*(	DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
-		DMP_FEATURE_GYRO_CAL, // Use gyro calibration
-		DMP_SAMPLE_RATE) // Set DMP FIFO rate to 200 Hz */
-	if ( IMUs[i].dmpBegin( DMP_FEATURE_6X_LP_QUAT | DMP_FEATURE_GYRO_CAL, DMP_SAMPLE_RATE) != INV_SUCCESS )
-		while (1)
-		{
-			printf("Unable to setup DMP in MPU-9250 nr %d\n", i);
-			printf("Check connections, and try again.\n");
-			HAL_Delay(1000);
-		}
-  }
-
-  set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
-  if ( IMUs[0].enableInterrupt(0) != INV_SUCCESS)
-	while (1)
-	{
-		printf("Unable to disable interrupt.\n");
-		printf("Check connections, and try again.\n");
-		HAL_Delay(1000);
-	}
-  printf("Setup done.\n");
+  SetupMPUSensors();
 
   ////////////////// MEASUREMENT START //////////////////////
   printf("Press SW1 to start.\n");
   while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin))
   {
-	  delay_ms(100);
+	  delay_ms(20);
   }
   printf("Measurement start.\n");
 
+#if MPU_DMP_DATA_ENABLE
   ////////////////// RESET FIFO /////////////////////////////
   for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
   {
@@ -214,6 +161,7 @@ int main(void)
 	IMUs[i].resetFifo();
   }
   printf("Fifo reset done.\n");
+#endif
 
   ////////////////// RESET SYSTICK /////////////////////////
 //  __disable_irq();
@@ -538,10 +486,101 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void SetupMPUSensors(void)
+{
+	///////////////// SPI FOR MPU9250 SET ///////////////////////
+	set_spi_handler(&hspi1);
+
+	///////////////// SENSOR CHECK ///////////////////////
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+	  set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+	  if(!test_whoAmI())
+		  while(1)
+		  {
+			  // Sensor check fail
+			  printf("Sensor check fail! Try again.\n");
+			  delay_ms(1000);
+		  }
+	}
+	printf("Sensor check passed.\n");
+
+	////////////////// SETUP /////////////////////////////
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+
+		// Call IMUs[i].begin() to verify communication and initialize
+		if (IMUs[i].begin() != INV_SUCCESS)
+		{
+			while (1)
+			{
+				printf("Unable to communicate with MPU-9250\n");
+				printf("Check connections, and try again.\n");
+				HAL_Delay(5000);
+			}
+		}
+
+#if MPU_DMP_DATA_ENABLE
+		// DMP_FEATURE_LP_QUAT can also be used. It uses the
+		// accelerometer in low-power mode to estimate quat's.
+		// DMP_FEATURE_LP_QUAT and 6X_LP_QUAT are mutually exclusive
+		/*(	DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
+			DMP_FEATURE_GYRO_CAL, // Use gyro calibration
+			MPU_SAMPLE_RATE) // Set DMP FIFO rate to 200 Hz */
+		if ( IMUs[i].dmpBegin( DMP_FEATURE_6X_LP_QUAT | DMP_FEATURE_GYRO_CAL, MPU_SAMPLE_RATE) != INV_SUCCESS )
+			while (1)
+			{
+				printf("Unable to setup DMP in MPU-9250 nr %d\n", i);
+				printf("Check connections, and try again.\n");
+				HAL_Delay(1000);
+			}
+#else
+		// Enable all sensors, and set sample rates to 4Hz.
+		// (Slow so we can see the interrupt work.)
+		IMUs[i].setSensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
+		IMUs[i].setSampleRate(MPU_SAMPLE_RATE); // Set accel/gyro sample rate to 100 Hz
+		IMUs[i].setCompassSampleRate(MPU_SAMPLE_RATE); // Set mag rate to 100 Hz
+
+		if(i == 0)
+		{
+			// Use enableInterrupt() to configure the MPU-9250's
+			// interrupt output as a "data ready" indicator.
+	//		IMUs[i].enableInterrupt(1); Not yet
+
+			// The interrupt level can either be active-high or low.
+			// Configure as active-low, since we'll be using the pin's
+			// internal pull-up resistor.
+			// Options are INT_ACTIVE_LOW or INT_ACTIVE_HIGH
+			IMUs[i].setIntLevel(INT_ACTIVE_LOW);
+
+			// The interrupt can be set to latch until data has
+			// been read, or to work as a 50us pulse.
+			// Use latching method -- we'll read from the sensor
+			// as soon as we see the pin go LOW.
+			// Options are INT_LATCHED or INT_50US_PULSE
+			IMUs[i].setIntLatched(INT_50US_PULSE);
+		}
+#endif
+	}
+
+	////////////////// Disable interrupts /////////////////////////////
+	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
+	if ( IMUs[0].enableInterrupt(0) != INV_SUCCESS)
+	while (1)
+	{
+		printf("Unable to disable interrupt.\n");
+		printf("Check connections, and try again.\n");
+		HAL_Delay(1000);
+	}
+
+	printf("Setup done.\n");
+}
+
 void printIMUData(uint8_t sensor_number)
 {
+#if MPU_DMP_DATA_ENABLE
 	char str1[10], str2[10];
-
 	// After calling dmpUpdateFifo() the ax, gx, mx, etc. values
 	// are all updated.
 	// Quaternion values are, by default, stored in Q30 long
@@ -566,9 +605,48 @@ void printIMUData(uint8_t sensor_number)
 //	printf("R/P/Y: %s, %s", str1, str2);
 //	ftoa(IMUs[sensor_number].yaw, str1);
 //	printf(", %s\n", str1);
+#else
+	char str1[10], str2[10], str3[10];
+	// After calling update() the ax, ay, az, gx, gy, gz, mx,
+	// my, mz, time, and/or temerature class variables are all
+	// updated. Access them by placing the object. in front:
+
+	printf("Sensor: %d\n", sensor_number);
+
+	// Use the calcAccel, calcGyro, and calcMag functions to
+	// convert the raw sensor readings (signed 16-bit values)
+	// to their respective units.
+	float data1 = IMUs[sensor_number].calcAccel(IMUs[sensor_number].ax);
+	float data2 = IMUs[sensor_number].calcAccel(IMUs[sensor_number].ay);
+	float data3 = IMUs[sensor_number].calcAccel(IMUs[sensor_number].az);
+
+	// Accel
+	ftoa(data1, str1);
+	ftoa(data2, str2);
+	ftoa(data3, str3);
+	printf("A: %s, %s, %s g\n", str1, str2, str3);
+
+	// Gyro
+	data1 = IMUs[sensor_number].calcGyro(IMUs[sensor_number].gx);
+	data2 = IMUs[sensor_number].calcGyro(IMUs[sensor_number].gy);
+	data3 = IMUs[sensor_number].calcGyro(IMUs[sensor_number].gz);
+	ftoa(data1, str1);
+	ftoa(data2, str2);
+	ftoa(data3, str3);
+	printf("G: %s, %s, %s dps\n", str1, str2, str3);
+
+	// Mag
+	data1 = IMUs[sensor_number].calcMag(IMUs[sensor_number].mx);
+	data2 = IMUs[sensor_number].calcMag(IMUs[sensor_number].my);
+	data3 = IMUs[sensor_number].calcMag(IMUs[sensor_number].mz);
+	ftoa(data1, str1);
+	ftoa(data2, str2);
+	ftoa(data3, str3);
+	printf("M: %s, %s, %s uT\n", str1, str2, str3);
+#endif
 
 	// Time
-	printf("Time: %lu ms\n", IMUs[sensor_number].time);
+	printf("Time: %lu ms\n\n", IMUs[sensor_number].time);
 }
 
 extern "C" {
@@ -618,11 +696,13 @@ void readMpuDataCallback(void)
 		__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
 		static uint8_t numOfIters = 0u;
-		static constexpr uint8_t numOfItersToPrint = DMP_SAMPLE_RATE; // value set for 1Hz printf refresh rate
+		static constexpr uint8_t numOfItersToPrint = MPU_SAMPLE_RATE; // value set for 1Hz printf refresh rate
 
 		for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 		{
 			set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+
+#if MPU_DMP_DATA_ENABLE
 			// Check for new data in the FIFO
 			if (i == 0 )
 				while(!IMUs[i].fifoAvailable())
@@ -641,6 +721,21 @@ void readMpuDataCallback(void)
 			{
 				printf("DMP update fifo read error!\n");
 			}
+#else
+			// Check whether magnetometer data is ready
+			if(i == 0)
+			{
+				delay_us(5);
+//				while(!IMUs[i].magDataReady())
+//				{
+//					;
+//				}
+			}
+
+		    // Call update() to update the imu objects sensor data.
+			if(IMUs[i].update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS) != INV_SUCCESS)
+				printf("IMU data read error!\n");
+#endif
 		}
 
 		numOfIters++;

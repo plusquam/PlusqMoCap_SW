@@ -311,6 +311,13 @@ inv_error_t MPU9250_DMP::update(unsigned char sensors)
 	if (sensors & UPDATE_TEMP)
 		tErr = updateTemperature();
 	
+	//TODO Remove that trash!
+	if(aErr | gErr | mErr | tErr)
+	{
+		aErr += 1;
+		aErr -= 1;
+	}
+
 	return aErr | gErr | mErr | tErr;
 }
 
@@ -705,4 +712,20 @@ static void tap_cb(unsigned char direction, unsigned char count)
 static void orient_cb(unsigned char orient)
 {
 	mpu9250_orientation = orient;
+}
+
+#ifndef AKM_DATA_READY
+#define AKM_DATA_READY      (0x01)
+#endif
+
+bool MPU9250_DMP::magDataReady()
+{
+	bool isReady = false;
+	unsigned char data;
+	if(mpu_read_reg(MPU9250_EXT_SENS_DATA_00, &data) == INV_SUCCESS)
+	{
+		if(data & AKM_DATA_READY)
+			isReady = true;
+	}
+	return isReady;
 }

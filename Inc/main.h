@@ -47,7 +47,12 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-
+#define MPU_DMP_DATA_ENABLE	0 // Set to 0 for raw sensor data, 1 for DMP data
+#if MPU_DMP_DATA_ENABLE
+#define MPU_SAMPLE_RATE 200 //[Hz]
+#else
+#define MPU_SAMPLE_RATE 100 //[Hz]
+#endif
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/

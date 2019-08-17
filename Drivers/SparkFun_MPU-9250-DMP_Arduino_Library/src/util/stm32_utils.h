@@ -15,6 +15,8 @@
 
 #define delay_ms  HAL_Delay
 
+extern void delay_us(uint8_t microseconds);
+
 int getMsWrapper(unsigned long *count);
 #define get_ms    getMsWrapper
 

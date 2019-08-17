@@ -10,24 +10,9 @@
 #include "MPU9250_RegisterMap.h"
 #include "stm32_utils.h"
 
-#define CORE_FREQ_MHZ 64u
-
 static SPI_HandleTypeDef *spi_handler;
 static uint16_t current_CS_pin;
 static GPIO_TypeDef *current_CS_port = NULL;
-
-static void delay_us(uint8_t microseconds)
-{
-	if(microseconds)
-	{
-		uint16_t counter;
-		const uint16_t limit = microseconds * CORE_FREQ_MHZ / 7u; // approximate number of cpu cycles per one for iteration
-		for( counter = 17u; counter < limit; ++counter)
-		{
-			;
-		}
-	}
-}
 
 void set_spi_handler(SPI_HandleTypeDef *handler)
 {
@@ -62,7 +47,7 @@ static inline uint8_t spi_write_register(uint8_t reg_addr, uint8_t * data, uint8
 	HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_SET);
 
 	if(returnVal == 3u)
-			printf("SPI read timout!\n");
+			printf("SPI write timeout!\n");
 	else if(returnVal)
 		printf("SPI write error!\n");
 
@@ -72,6 +57,14 @@ static inline uint8_t spi_write_register(uint8_t reg_addr, uint8_t * data, uint8
 static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_t length)
 {
 	uint8_t returnVal = 0u;
+
+	uint32_t CR1_old = spi_handler->Instance->CR1;
+	// Set higher SPI clock freq. for data registers
+	if((reg_addr >= 58u) && ((reg_addr + length - 1) <= 96u)) {
+		__IO uint32_t CR1_new = (CR1_old & ~(0x00000007 << 3u)) | SPI_BAUDRATEPRESCALER_8;
+		WRITE_REG(spi_handler->Instance->CR1, CR1_new);
+	}
+
 	if(length < 30)
 	{
 		reg_addr |= 0x80; //  MSB = 1 for reading operation
@@ -79,6 +72,7 @@ static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_
 		HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_RESET);
 		uint8_t dummy_buffer[30] = {0};
 		delay_us(1);
+
 		returnVal |= HAL_SPI_Transmit(spi_handler, &reg_addr, 1u, 2u);
 		if(!returnVal)
 			returnVal |= HAL_SPI_TransmitReceive(spi_handler, dummy_buffer, data, length, 1u * length + 1u);
@@ -93,8 +87,13 @@ static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_
 		returnVal = 1u;
 	}
 
+	// Restore SPI clock freq. for data registers
+	if((reg_addr >= 58u) && ((reg_addr + length - 1) <= 96u)) {
+		WRITE_REG(spi_handler->Instance->CR1, CR1_old);
+	}
+
 	if(returnVal == 3u)
-		printf("SPI read timout!\n");
+		printf("SPI read timeout!\n");
 	else if(returnVal)
 		printf("SPI read error!\n");
 

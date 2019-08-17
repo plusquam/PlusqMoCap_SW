@@ -8,6 +8,21 @@
 #include "stm32_utils.h"
 #include "main.h"
 
+#define CORE_FREQ_MHZ 32u
+
+void delay_us(uint8_t microseconds)
+{
+	if(microseconds)
+	{
+		uint16_t counter;
+		const uint16_t limit = microseconds * CORE_FREQ_MHZ / 7u; // approximate number of cpu cycles per one for iteration
+		for( counter = 17u; counter < limit; ++counter)
+		{
+			;
+		}
+	}
+}
+
 int getMsWrapper(unsigned long *count)
 {
 	*count = HAL_GetTick();
@@ -33,6 +48,7 @@ int getMsWrapper(unsigned long *count)
 
 #include <stdlib.h>
 #include <math.h>
+
 // prints a number with 2 digits following the decimal place
 // creates the string backwards, before printing it character-by-character from
 // the end to the start

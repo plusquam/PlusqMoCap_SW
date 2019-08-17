@@ -372,6 +372,8 @@ public:
 	//         Bit pos 2: mag
 	int selfTest(unsigned char debug = 0);
 	
+	bool magDataReady();
+
 private:
 	short _aSense;
 	float _gSense, _mSense;
