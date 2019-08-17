@@ -444,7 +444,7 @@ static const unsigned short sStartAddress = 0x0400;
 #define DMP_SAMPLE_RATE     (200)
 #define GYRO_SF             (46850825LL * 200 / DMP_SAMPLE_RATE)
 
-#define FIFO_CORRUPTION_CHECK
+//#define FIFO_CORRUPTION_CHECK
 #ifdef FIFO_CORRUPTION_CHECK
 #define QUAT_ERROR_THRESH       (1L<<24)
 #define QUAT_MAG_SQ_NORMALIZED  (1L<<28)
@@ -1294,8 +1294,8 @@ int dmp_read_fifo(short *gyro, short *accel, long *quat,
             sensors[0] = 0;
             return -1;
         }
-        sensors[0] |= INV_WXYZ_QUAT;
 #endif
+        sensors[0] |= INV_WXYZ_QUAT;
     }
 
     if (dmp.feature_mask & DMP_FEATURE_SEND_RAW_ACCEL) {

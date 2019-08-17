@@ -57,12 +57,14 @@ static inline uint8_t spi_write_register(uint8_t reg_addr, uint8_t * data, uint8
 
 	returnVal |= HAL_SPI_Transmit(spi_handler, &reg_addr, 1u, 2u);
 	if(!returnVal)
-		returnVal |= HAL_SPI_Transmit(spi_handler, data, length, 1u * length);
+		returnVal |= HAL_SPI_Transmit(spi_handler, data, length, 1u * length + 1u);
 
 	HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_SET);
 
-	if(returnVal)
-		printf("SPI write error!");
+	if(returnVal == 3u)
+			printf("SPI read timout!\n");
+	else if(returnVal)
+		printf("SPI write error!\n");
 
 	return returnVal;
 }
@@ -79,7 +81,9 @@ static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_
 		delay_us(1);
 		returnVal |= HAL_SPI_Transmit(spi_handler, &reg_addr, 1u, 2u);
 		if(!returnVal)
-			returnVal |= HAL_SPI_TransmitReceive(spi_handler, dummy_buffer, data, length, 1u * length);
+			returnVal |= HAL_SPI_TransmitReceive(spi_handler, dummy_buffer, data, length, 1u * length + 1u);
+		else
+			printf("SPI read init error!\n");
 
 		HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_SET);
 	}
@@ -89,8 +93,10 @@ static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_
 		returnVal = 1u;
 	}
 
-	if(returnVal)
-		printf("SPI read error!");
+	if(returnVal == 3u)
+		printf("SPI read timout!\n");
+	else if(returnVal)
+		printf("SPI read error!\n");
 
 	return returnVal;
 }

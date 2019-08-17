@@ -114,7 +114,13 @@ void HAL_GPIO_EXTI_Callback( uint16_t GPIO_Pin )
 	switch (GPIO_Pin)
 	{
 		case B1_Pin:
-			SCH_SetTask(1<<CFG_TASK_SW1_BUTTON_PUSHED_ID, CFG_SCH_PRIO_0);
+			SCH_SetTask(1<<CFG_TASK_SW1_BUTTON_PUSHED_ID, CFG_SCH_PRIO_1);
+			break;
+		case MPU_INT_Pin:
+			if(isMpuMeasureReady)
+				SCH_SetTask(1<<CFG_TASK_MPU9250_INT_ID, CFG_SCH_PRIO_0);
+			else
+				printf("NotReady\n");
 			break;
 		default:
 			break;
@@ -353,7 +359,7 @@ void SCH_EvtIdle( uint32_t evt_waited_bm )
 
 void shci_notify_asynch_evt(void* pdata)
 {
-  SCH_SetTask( 1<<CFG_TASK_SYSTEM_HCI_ASYNCH_EVT_ID, CFG_SCH_PRIO_0);
+  SCH_SetTask( 1<<CFG_TASK_SYSTEM_HCI_ASYNCH_EVT_ID, CFG_SCH_PRIO_1);
   return;
 }
 
@@ -390,7 +396,7 @@ void DbgOutputInit( void )
   */
 void DbgOutputTraces(  uint8_t *p_data, uint16_t size, void (*cb)(void) )
 {
-	HW_UART_Transmit_IT(DBG_TRACE_UART_CFG, p_data, size, cb);
+	HW_UART_Transmit_DMA(DBG_TRACE_UART_CFG, p_data, size, cb);
 
   return;
 }

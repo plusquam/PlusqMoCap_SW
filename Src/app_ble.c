@@ -997,7 +997,7 @@ static void Adv_Cancel_Req( void )
 /* USER CODE BEGIN Adv_Cancel_Req_1 */
 
 /* USER CODE END Adv_Cancel_Req_1 */
-  SCH_SetTask(1 << CFG_TASK_ADV_CANCEL_ID, CFG_SCH_PRIO_0);
+  SCH_SetTask(1 << CFG_TASK_ADV_CANCEL_ID, CFG_SCH_PRIO_1);
 /* USER CODE BEGIN Adv_Cancel_Req_2 */
 
 /* USER CODE END Adv_Cancel_Req_2 */
@@ -1058,7 +1058,7 @@ void BLE_SVC_L2CAP_Conn_Update(uint16_t Connection_Handle)
  *************************************************************/
 void hci_notify_asynch_evt(void* pdata)
 {
-  SCH_SetTask(1 << CFG_TASK_HCI_ASYNCH_EVT_ID, CFG_SCH_PRIO_0);
+  SCH_SetTask(1 << CFG_TASK_HCI_ASYNCH_EVT_ID, CFG_SCH_PRIO_1);
   return;
 }
 

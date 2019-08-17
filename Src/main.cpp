@@ -28,6 +28,8 @@
 extern "C" {
 #include "stm32_mpu9250_spi.h"
 #include "stm32_utils.h"
+#include "app_conf.h"
+//#include "utilities_common.h"
 }
 
 /* USER CODE END Includes */
@@ -61,6 +63,7 @@ RTC_HandleTypeDef hrtc;
 SPI_HandleTypeDef hspi1;
 
 UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 
@@ -71,11 +74,13 @@ SpiSlaveHandler_t spiSlavesArray[] =
 	[2] = {.number = 2, .port = SPI1_CS_2_GPIO_Port, .pin = SPI1_CS_2_Pin}
 };
 #define NUMBER_OF_SENSORS (sizeof(spiSlavesArray)/sizeof(SpiSlaveHandler_t))
+volatile uint8_t isMpuMeasureReady = 0u;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_RF_Init(void);
@@ -83,9 +88,8 @@ static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 
 MPU9250_DMP IMUs[NUMBER_OF_SENSORS];
-void setup();
 void printIMUData(uint8_t sensor_number);
-void loop();
+void readMpuDataCallback(void);
 
 /* USER CODE END PFP */
 
@@ -126,6 +130,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART1_UART_Init();
   MX_SPI1_Init();
   MX_RF_Init();
@@ -154,14 +159,6 @@ int main(void)
   }
   printf("Sensor check passed.\n");
 
-  ////////////////// MEASUREMENT START //////////////////////
-  printf("Press SW1 to start.\n");
-  while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin))
-  {
-	  delay_ms(100);
-  }
-  printf("Measurement start.\n");
-
   ////////////////// SETUP /////////////////////////////
   for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
   {
@@ -177,14 +174,38 @@ int main(void)
 		}
 	}
 
-	IMUs[i].dmpBegin(	DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
-						DMP_FEATURE_GYRO_CAL, // Use gyro calibration
-						DMP_SAMPLE_RATE); // Set DMP FIFO rate to 10 Hz
-						// DMP_FEATURE_LP_QUAT can also be used. It uses the
-						// accelerometer in low-power mode to estimate quat's.
-						// DMP_FEATURE_LP_QUAT and 6X_LP_QUAT are mutually exclusive
+	// DMP_FEATURE_LP_QUAT can also be used. It uses the
+	// accelerometer in low-power mode to estimate quat's.
+	// DMP_FEATURE_LP_QUAT and 6X_LP_QUAT are mutually exclusive
+	/*(	DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
+		DMP_FEATURE_GYRO_CAL, // Use gyro calibration
+		DMP_SAMPLE_RATE) // Set DMP FIFO rate to 200 Hz */
+	if ( IMUs[i].dmpBegin( DMP_FEATURE_6X_LP_QUAT | DMP_FEATURE_GYRO_CAL, DMP_SAMPLE_RATE) != INV_SUCCESS )
+		while (1)
+		{
+			printf("Unable to setup DMP in MPU-9250 nr %d\n", i);
+			printf("Check connections, and try again.\n");
+			HAL_Delay(1000);
+		}
   }
+
+  set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
+  if ( IMUs[0].enableInterrupt(0) != INV_SUCCESS)
+	while (1)
+	{
+		printf("Unable to disable interrupt.\n");
+		printf("Check connections, and try again.\n");
+		HAL_Delay(1000);
+	}
   printf("Setup done.\n");
+
+  ////////////////// MEASUREMENT START //////////////////////
+  printf("Press SW1 to start.\n");
+  while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin))
+  {
+	  delay_ms(100);
+  }
+  printf("Measurement start.\n");
 
   ////////////////// RESET FIFO /////////////////////////////
   for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
@@ -195,56 +216,26 @@ int main(void)
   printf("Fifo reset done.\n");
 
   ////////////////// RESET SYSTICK /////////////////////////
-  __disable_irq();
-  uwTick = 0lu;
-  __enable_irq();
+//  __disable_irq();
+//  uwTick = 0lu;
+//  __enable_irq();
 
+  ////////////////// SET MPU9250 INTERRUPT /////////////////////////
+  SCH_RegTask( CFG_TASK_MPU9250_INT_ID, readMpuDataCallback );
+  set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
+  IMUs[0].enableInterrupt(1);
+  uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
+  __disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
+  isMpuMeasureReady = 1u;
+  __set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
   ////////////////// LOOP START ///////////////////////////
-  uint8_t numOfIters = 0u;
-  constexpr uint8_t numOfItersToPrint = DMP_SAMPLE_RATE; // value set for 1Hz printf refresh rate
-
-
   while (1)
   {
-
-	numOfIters++;
-	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-	{
-		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-		// Check for new data in the FIFO
-		if (i == 0 )
-			while(!IMUs[i].fifoAvailable())
-			{
-				delay_ms(1);
-			}
-
-		// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
-		if ( IMUs[i].dmpUpdateFifo() == INV_SUCCESS)
-		{
-			// computeEulerAngles can be used -- after updating the
-			// quaternion values -- to estimate roll, pitch, and yaw
-//			IMUs[i].computeEulerAngles();
-		}
-		else
-		{
-			printf("DMP update fifo read error!\n");
-		}
-
-		if(numOfIters >= numOfItersToPrint)
-			printIMUData(i);
-	}
-
-	if(numOfIters >= numOfItersToPrint) {
-		HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
-		numOfIters = 0u;
-		printf("\n");
-	}
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 	// Run all tasks
-	SCH_Run(~0);
+	SCH_Run(SCH_DEFAULT);
   }
   /* USER CODE END 3 */
 }
@@ -395,7 +386,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -460,6 +451,22 @@ static void MX_USART1_UART_Init(void)
 
 }
 
+/** 
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void) 
+{
+  /* DMA controller clock enable */
+  __HAL_RCC_DMAMUX1_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+
+}
+
 /**
   * @brief GPIO Initialization Function
   * @param None
@@ -480,6 +487,12 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD2_Pin|LD3_Pin|LD1_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : MPU_INT_Pin */
+  GPIO_InitStruct.Pin = MPU_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(MPU_INT_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : SPI1_CS_0_Pin SPI1_CS_1_Pin SPI1_CS_2_Pin SPI1_CS_3_Pin */
   GPIO_InitStruct.Pin = SPI1_CS_0_Pin|SPI1_CS_1_Pin|SPI1_CS_2_Pin|SPI1_CS_3_Pin;
@@ -516,6 +529,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
   HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
@@ -588,8 +604,67 @@ void HAL_Delay(uint32_t Delay)
   while ((HAL_GetTick() - tickstart) < wait)
   {
 	  // Run all tasks
-	  	SCH_Run(~0);
+	  	SCH_Run(SCH_DEFAULT);
   }
+}
+
+void readMpuDataCallback(void)
+{
+	uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
+	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
+	if(isMpuMeasureReady)
+	{
+		isMpuMeasureReady = 0u;
+		__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
+
+		static uint8_t numOfIters = 0u;
+		static constexpr uint8_t numOfItersToPrint = DMP_SAMPLE_RATE; // value set for 1Hz printf refresh rate
+
+		for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+		{
+			set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+			// Check for new data in the FIFO
+			if (i == 0 )
+				while(!IMUs[i].fifoAvailable())
+				{
+					delay_ms(1);
+				}
+
+			// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
+			if ( IMUs[i].dmpUpdateFifo() == INV_SUCCESS)
+			{
+				// computeEulerAngles can be used -- after updating the
+				// quaternion values -- to estimate roll, pitch, and yaw
+	//			IMUs[i].computeEulerAngles();
+			}
+			else
+			{
+				printf("DMP update fifo read error!\n");
+			}
+		}
+
+		numOfIters++;
+
+		if(numOfIters >= numOfItersToPrint) {
+			for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+			{
+				printIMUData(i);
+			}
+
+			HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
+			numOfIters = 0u;
+			printf("\n");
+		}
+
+		primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
+		__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
+		isMpuMeasureReady = 1u;
+		__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
+	}
+	else
+	{
+		__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
+	}
 }
 
 /* USER CODE END 4 */

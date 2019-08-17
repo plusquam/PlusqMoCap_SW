@@ -453,7 +453,7 @@ typedef enum
     CFG_FIRST_TASK_ID_WITH_NO_HCICMD = CFG_LAST_TASK_ID_WITH_HCICMD - 1,        /**< Shall be FIRST in the list */
     CFG_TASK_SYSTEM_HCI_ASYNCH_EVT_ID,
 /* USER CODE BEGIN CFG_Task_Id_With_NO_HCI_Cmd_t */
-
+	CFG_TASK_MPU9250_INT_ID,
 /* USER CODE END CFG_Task_Id_With_NO_HCI_Cmd_t */
     CFG_LAST_TASK_ID_WITHO_NO_HCICMD                                            /**< Shall be LAST in the list */
 } CFG_Task_Id_With_NO_HCI_Cmd_t;
@@ -466,6 +466,7 @@ typedef enum
 typedef enum
 {
     CFG_SCH_PRIO_0,
+	CFG_SCH_PRIO_1,
     CFG_PRIO_NBR,
 } CFG_SCH_Prio_Id_t;
 

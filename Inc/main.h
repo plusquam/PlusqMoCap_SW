@@ -58,6 +58,9 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define MPU_INT_Pin GPIO_PIN_0
+#define MPU_INT_GPIO_Port GPIOA
+#define MPU_INT_EXTI_IRQn EXTI0_IRQn
 #define SPI1_CS_0_Pin GPIO_PIN_2
 #define SPI1_CS_0_GPIO_Port GPIOA
 #define SPI1_CS_1_Pin GPIO_PIN_3
@@ -93,7 +96,7 @@ void Error_Handler(void);
 
 //SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart1;
-
+extern volatile uint8_t isMpuMeasureReady;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
