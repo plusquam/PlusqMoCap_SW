@@ -143,6 +143,8 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+  ////////////////// SENSORS SETUP //////////////////////////
   SetupMPUSensors();
 
   ////////////////// MEASUREMENT START //////////////////////
@@ -698,6 +700,14 @@ void readMpuDataCallback(void)
 		static uint8_t numOfIters = 0u;
 		static constexpr uint8_t numOfItersToPrint = MPU_SAMPLE_RATE; // value set for 1Hz printf refresh rate
 
+		// Get timestamp
+		unsigned long timestamp;
+	    get_ms(&timestamp);
+	    for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	    {
+	    	IMUs[i].time = timestamp;
+	    }
+
 		for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 		{
 			set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
@@ -725,7 +735,7 @@ void readMpuDataCallback(void)
 			// Check whether magnetometer data is ready
 			if(i == 0)
 			{
-				delay_us(5);
+				delay_us(10);
 //				while(!IMUs[i].magDataReady())
 //				{
 //					;
@@ -733,7 +743,8 @@ void readMpuDataCallback(void)
 			}
 
 		    // Call update() to update the imu objects sensor data.
-			if(IMUs[i].update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS) != INV_SUCCESS)
+//			if(IMUs[i].update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS) != INV_SUCCESS)
+			if(IMUs[i].allDataUpdate() != INV_SUCCESS)
 				printf("IMU data read error!\n");
 #endif
 		}

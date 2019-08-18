@@ -127,9 +127,12 @@ int mpu_load_firmware(unsigned short length, const unsigned char *firmware,
 
 int mpu_reg_dump(void);
 int mpu_read_reg(unsigned char reg, unsigned char *data);
+int mpu_read_multi_reg(unsigned char reg, unsigned char *data, unsigned char length);
 int mpu_run_self_test(long *gyro, long *accel);
 int mpu_run_6500_self_test(long *gyro, long *accel, unsigned char debug);
 int mpu_register_tap_cb(void (*func)(unsigned char, unsigned char));
+
+void getMagSensAdj(short *mag_sens_adj_x, short *mag_sens_adj_y, short *mag_sens_adj_z);
 
 #endif  /* #ifndef _INV_MPU_H_ */
 

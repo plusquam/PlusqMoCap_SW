@@ -310,13 +310,6 @@ inv_error_t MPU9250_DMP::update(unsigned char sensors)
 		mErr = updateCompass();
 	if (sensors & UPDATE_TEMP)
 		tErr = updateTemperature();
-	
-	//TODO Remove that trash!
-	if(aErr | gErr | mErr | tErr)
-	{
-		aErr += 1;
-		aErr -= 1;
-	}
 
 	return aErr | gErr | mErr | tErr;
 }
@@ -717,6 +710,15 @@ static void orient_cb(unsigned char orient)
 #ifndef AKM_DATA_READY
 #define AKM_DATA_READY      (0x01)
 #endif
+#ifndef AKM_DATA_OVERRUN
+#define AKM_DATA_OVERRUN    (0x02)
+#endif
+#ifndef AKM_OVERFLOW
+#define AKM_OVERFLOW        (0x80)
+#endif
+#ifndef AKM_DATA_ERROR
+#define AKM_DATA_ERROR      (0x40)
+#endif
 
 bool MPU9250_DMP::magDataReady()
 {
@@ -729,3 +731,140 @@ bool MPU9250_DMP::magDataReady()
 	}
 	return isReady;
 }
+
+inv_error_t MPU9250_DMP::allDataUpdate()
+{
+	constexpr unsigned char DATA_SIZE = (sizeof(ax) * 3) + sizeof(short) + (sizeof(gx) * 3) + 8;
+	// Data frame: 3acc + temp + 3gyro + 8B mag data
+	unsigned char data[DATA_SIZE];
+
+	if(mpu_read_multi_reg(MPU9250_ACCEL_XOUT_H, data, DATA_SIZE))
+		return INV_ERROR;
+
+	// Accel
+    ax = (data[0] << 8) | data[1];
+    ay = (data[2] << 8) | data[3];
+    az = (data[4] << 8) | data[5];
+
+    // Temperature // don't care now
+//    temperature = TODO
+
+    //Gyro
+    gx = (data[8] << 8) | data[9];
+    gy = (data[10] << 8) | data[11];
+    gz = (data[12] << 8) | data[13];
+
+    //Mag
+    if (!(data[14] & AKM_DATA_READY) || (data[14] & AKM_DATA_OVERRUN))
+        return -2;
+    if (data[21] & AKM_OVERFLOW)
+        return -3;
+
+    short mag_sens_adj[3];
+    getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+
+    mx = (data[16] << 8) | data[15];
+    my = (data[18] << 8) | data[17];
+    mz = (data[20] << 8) | data[19];
+
+    mx = ((long)mx * mag_sens_adj[0]) >> 8;
+    my = ((long)my * mag_sens_adj[1]) >> 8;
+    mz = ((long)mz * mag_sens_adj[2]) >> 8;
+
+	return INV_SUCCESS;
+}
+
+//int mpu_get_compass_reg(short *data, unsigned long *timestamp)
+//{
+//#ifdef AK89xx_SECONDARY
+//    unsigned char tmp[9];
+//
+//    if (!(st.chip_cfg.sensors & INV_XYZ_COMPASS))
+//        return -1;
+//
+//#ifdef AK89xx_BYPASS
+//    if (i2c_read(st.chip_cfg.compass_addr, AKM_REG_ST1, 8, tmp))
+//        return -1;
+//    tmp[8] = AKM_SINGLE_MEASUREMENT;
+//    if (i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL, 1, tmp+8))
+//        return -1;
+//#else
+//    if (i2c_read(st.hw->addr, st.reg->raw_compass, 8, tmp))
+//        return -1;
+//#endif
+//
+//#if defined AK8975_SECONDARY
+//    /* AK8975 doesn't have the overrun error bit. */
+//    if (!(tmp[0] & AKM_DATA_READY))
+//        return -2;
+//    if ((tmp[7] & AKM_OVERFLOW) || (tmp[7] & AKM_DATA_ERROR))
+//        return -3;
+//#elif defined AK8963_SECONDARY
+//    /* AK8963 doesn't have the data read error bit. */
+//    if (!(tmp[0] & AKM_DATA_READY) || (tmp[0] & AKM_DATA_OVERRUN))
+//        return -2;
+//    if (tmp[7] & AKM_OVERFLOW)
+//        return -3;
+//#endif
+//    data[0] = (tmp[2] << 8) | tmp[1];
+//    data[1] = (tmp[4] << 8) | tmp[3];
+//    data[2] = (tmp[6] << 8) | tmp[5];
+//
+//    data[0] = ((long)data[0] * st.chip_cfg.mag_sens_adj[0]) >> 8;
+//    data[1] = ((long)data[1] * st.chip_cfg.mag_sens_adj[1]) >> 8;
+//    data[2] = ((long)data[2] * st.chip_cfg.mag_sens_adj[2]) >> 8;
+//
+//    if (timestamp)
+//        get_ms(timestamp);
+//    return 0;
+//#else
+//    return -1;
+//#endif
+//}
+
+//int MPU9250_DMP::updateAccel(void)
+//{
+//	short data[3];
+//
+//	if (mpu_get_accel_reg(data, &time))
+//	{
+//		return INV_ERROR;
+//	}
+//	ax = data[X_AXIS];
+//	ay = data[Y_AXIS];
+//	az = data[Z_AXIS];
+//	return INV_SUCCESS;
+//}
+//
+//int MPU9250_DMP::updateGyro(void)
+//{
+//	short data[3];
+//
+//	if (mpu_get_gyro_reg(data, &time))
+//	{
+//		return INV_ERROR;
+//	}
+//	gx = data[X_AXIS];
+//	gy = data[Y_AXIS];
+//	gz = data[Z_AXIS];
+//	return INV_SUCCESS;
+//}
+//
+//int MPU9250_DMP::updateCompass(void)
+//{
+//	short data[3];
+//
+//	if (mpu_get_compass_reg(data, &time))
+//	{
+//		return INV_ERROR;
+//	}
+//	mx = data[X_AXIS];
+//	my = data[Y_AXIS];
+//	mz = data[Z_AXIS];
+//	return INV_SUCCESS;
+//}
+//
+//inv_error_t MPU9250_DMP::updateTemperature(void)
+//{
+//	return mpu_get_temperature(&temperature, &time);
+//}

@@ -628,6 +628,23 @@ int mpu_read_reg(unsigned char reg, unsigned char *data)
 }
 
 /**
+ *  @brief      Read from multiple registers.
+ *  NOTE: The memory and FIFO read/write registers cannot be accessed.
+ *  @param[in]  reg     Register address.
+ *  @param[out] data    Register data.
+ *  @param[in]	length	Length of data.
+ *  @return     0 if successful.
+ */
+int mpu_read_multi_reg(unsigned char reg, unsigned char *data, unsigned char length)
+{
+    if (reg == st.reg->fifo_r_w || reg == st.reg->mem_r_w)
+        return -1;
+    if (reg >= st.hw->num_reg)
+        return -1;
+    return i2c_read(st.hw->addr, reg, length, data);
+}
+
+/**
  *  @brief      Initialize hardware.
  *  Initial configuration:\n
  *  Gyro FSR: +/- 2000DPS\n
@@ -3241,6 +3258,13 @@ lp_int_restore:
 
     st.chip_cfg.int_motion_only = 0;
     return 0;
+}
+
+void getMagSensAdj(short *mag_sens_adj_x, short *mag_sens_adj_y, short *mag_sens_adj_z)
+{
+	*mag_sens_adj_x = st.chip_cfg.mag_sens_adj[0];
+	*mag_sens_adj_y = st.chip_cfg.mag_sens_adj[1];
+	*mag_sens_adj_z = st.chip_cfg.mag_sens_adj[2];
 }
 
 /**

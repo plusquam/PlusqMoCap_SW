@@ -67,9 +67,9 @@ const signed char defaultOrientation[9] = {
 class MPU9250_DMP 
 {
 public:
-	int ax, ay, az;
-	int gx, gy, gz;
-	int mx, my, mz;
+	short ax, ay, az;
+	short gx, gy, gz;
+	short mx, my, mz;
 	long qw, qx, qy, qz;
 	long temperature;
 	unsigned long time;
@@ -373,6 +373,12 @@ public:
 	int selfTest(unsigned char debug = 0);
 	
 	bool magDataReady();
+
+	// allDataUpdate -- Reads latest data from the MPU-9250's data registers.
+	// Output: INV_SUCCESS (0) on success, otherwise error
+	// Note: after a successful update the public sensor variables
+	// (e.g. ax, ay, az, gx, gy, gz) will be updated with new data
+	inv_error_t allDataUpdate();
 
 private:
 	short _aSense;
