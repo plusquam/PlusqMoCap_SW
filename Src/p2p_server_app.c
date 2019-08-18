@@ -148,7 +148,7 @@ void P2PS_APP_Notification(P2PS_APP_ConnHandle_Not_evt_t *pNotification)
 /* USER CODE END P2PS_APP_Notification_P2P_Evt_Opcode */
   case PEER_CONN_HANDLE_EVT :
 /* USER CODE BEGIN PEER_CONN_HANDLE_EVT */
-
+	  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 /* USER CODE END PEER_CONN_HANDLE_EVT */
     break;
 

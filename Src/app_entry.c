@@ -119,8 +119,8 @@ void HAL_GPIO_EXTI_Callback( uint16_t GPIO_Pin )
 		case MPU_INT_Pin:
 			if(isMpuMeasureReady)
 				SCH_SetTask(1<<CFG_TASK_MPU9250_INT_ID, CFG_SCH_PRIO_0);
-			else
-				printf("NotReady\n");
+//			else
+//				printf("NotReady\n");
 			break;
 		default:
 			break;

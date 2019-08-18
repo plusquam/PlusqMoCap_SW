@@ -127,10 +127,10 @@
 #define CONN_P(x) ((int)((x)/1.25f))
 
   /*  L2CAP Connection Update request parameters used for test only with smart Phone */
-#define L2CAP_REQUEST_NEW_CONN_PARAM             0
+#define L2CAP_REQUEST_NEW_CONN_PARAM             1
 
-#define L2CAP_INTERVAL_MIN              CONN_P(1000) /* 1s */
-#define L2CAP_INTERVAL_MAX              CONN_P(1000) /* 1s */
+#define L2CAP_INTERVAL_MIN              (7.5f) /* ms */
+#define L2CAP_INTERVAL_MAX              (10.f) /* ms */
 #define L2CAP_SLAVE_LATENCY             0x0000
 #define L2CAP_TIMEOUT_MULTIPLIER        0x1F4
 
@@ -466,7 +466,7 @@ typedef enum
 typedef enum
 {
     CFG_SCH_PRIO_0,
-	CFG_SCH_PRIO_1,
+    CFG_SCH_PRIO_1,
     CFG_PRIO_NBR,
 } CFG_SCH_Prio_Id_t;
 
