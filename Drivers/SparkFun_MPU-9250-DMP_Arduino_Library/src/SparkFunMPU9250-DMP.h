@@ -380,6 +380,8 @@ public:
 	// (e.g. ax, ay, az, gx, gy, gz) will be updated with new data
 	inv_error_t allDataUpdate();
 
+	inv_error_t resetDevice(void);
+
 private:
 	short _aSense;
 	float _gSense, _mSense;

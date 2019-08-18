@@ -144,8 +144,28 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  ////////////////// SENSORS SETUP //////////////////////////
-  SetupMPUSensors();
+	///////////////// SPI FOR MPU9250 SET ///////////////////////
+	set_spi_handler(&hspi1);
+
+	///////////////// SENSOR CHECK ///////////////////////
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+	  set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+	  if(!test_whoAmI())
+		  while(1)
+		  {
+			  // Sensor check fail
+			  printf("Sensor check fail! Try again.\n");
+			  delay_ms(1000);
+		  }
+	}
+	printf("Sensors check passed.\n");
+
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		IMUs[i].resetDevice();
+	}
+	printf("Sensors reset.\n");
 
   ////////////////// MEASUREMENT START //////////////////////
   printf("Press SW1 to start.\n");
@@ -154,6 +174,9 @@ int main(void)
 	  delay_ms(20);
   }
   printf("Measurement start.\n");
+
+  ////////////////// SENSORS SETUP //////////////////////////
+  SetupMPUSensors();
 
 #if MPU_DMP_DATA_ENABLE
   ////////////////// RESET FIFO /////////////////////////////
@@ -490,23 +513,6 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void SetupMPUSensors(void)
 {
-	///////////////// SPI FOR MPU9250 SET ///////////////////////
-	set_spi_handler(&hspi1);
-
-	///////////////// SENSOR CHECK ///////////////////////
-	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-	{
-	  set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-	  if(!test_whoAmI())
-		  while(1)
-		  {
-			  // Sensor check fail
-			  printf("Sensor check fail! Try again.\n");
-			  delay_ms(1000);
-		  }
-	}
-	printf("Sensor check passed.\n");
-
 	////////////////// SETUP /////////////////////////////
 	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 	{
@@ -648,7 +654,7 @@ void printIMUData(uint8_t sensor_number)
 #endif
 
 	// Time
-	printf("Time: %lu ms\n\n", IMUs[sensor_number].time);
+	printf("Time: %lu ms\n", IMUs[sensor_number].time);
 }
 
 extern "C" {

@@ -3267,6 +3267,17 @@ void getMagSensAdj(short *mag_sens_adj_x, short *mag_sens_adj_y, short *mag_sens
 	*mag_sens_adj_z = st.chip_cfg.mag_sens_adj[2];
 }
 
+int mpu_reset()
+{
+    unsigned char data;
+
+    /* Reset device. */
+    data = BIT_RESET;
+    if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, &data))
+        return -1;
+
+    return 0;
+}
 /**
  *  @}
  */
