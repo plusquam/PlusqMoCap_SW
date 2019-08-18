@@ -229,9 +229,7 @@ PLACE_IN_SECTION("BLE_APP_CONTEXT") static uint16_t AdvIntervalMin, AdvIntervalM
 P2PS_APP_ConnHandle_Not_evt_t handleNotification;
 
 #if L2CAP_REQUEST_NEW_CONN_PARAM != 0
-#define SIZE_TAB_CONN_INT            2
-float tab_conn_interval[SIZE_TAB_CONN_INT] = {50, 1000} ; /* ms */
-uint8_t index_con_int, mutex; 
+uint8_t mutex;
 #endif 
 
 /**
@@ -454,7 +452,6 @@ void APP_BLE_Init( void )
 #endif  
   
 #if (L2CAP_REQUEST_NEW_CONN_PARAM != 0 )
-  index_con_int = 0; 
   mutex = 1; 
 #endif
   /**
@@ -1018,9 +1015,8 @@ void BLE_SVC_L2CAP_Conn_Update(uint16_t Connection_Handle)
 /* USER CODE END BLE_SVC_L2CAP_Conn_Update_1 */
   if(mutex == 1) { 
     mutex = 0;
-    index_con_int = (index_con_int + 1)%SIZE_TAB_CONN_INT;
-    uint16_t interval_min = CONN_P(tab_conn_interval[index_con_int]);
-    uint16_t interval_max = CONN_P(tab_conn_interval[index_con_int]);
+    uint16_t interval_min = CONN_P(L2CAP_INTERVAL_MIN);
+    uint16_t interval_max = CONN_P(L2CAP_INTERVAL_MAX);
     uint16_t slave_latency = L2CAP_SLAVE_LATENCY;
     uint16_t timeout_multiplier = L2CAP_TIMEOUT_MULTIPLIER;
     tBleStatus result;
