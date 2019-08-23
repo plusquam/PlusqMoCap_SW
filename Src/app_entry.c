@@ -114,7 +114,7 @@ void HAL_GPIO_EXTI_Callback( uint16_t GPIO_Pin )
 	switch (GPIO_Pin)
 	{
 		case B1_Pin:
-			SCH_SetTask(1<<CFG_TASK_SW1_BUTTON_PUSHED_ID, CFG_SCH_PRIO_1);
+//			SCH_SetTask(1<<CFG_TASK_MPU_DATA_READY_ID, CFG_SCH_PRIO_1);
 			break;
 		case MPU_INT_Pin:
 			if(isMpuMeasureReady)

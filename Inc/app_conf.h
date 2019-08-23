@@ -74,7 +74,7 @@
 /**
  * Define PHY
  */
-#define ALL_PHYS_PREFERENCE                             0x00
+#define ALL_PHYS_PREFERENCE                             0x02
 #define RX_2M_PREFERRED                                 0x02
 #define TX_2M_PREFERRED                                 0x02
 #define TX_1M                                           0x01
@@ -156,7 +156,7 @@
  * Note that certain characteristics and relative descriptors are added automatically during device initialization
  * so this parameters should be 9 plus the number of user Attributes
  */
-#define CFG_BLE_NUM_GATT_ATTRIBUTES 68
+#define CFG_BLE_NUM_GATT_ATTRIBUTES 150
 
 /**
  * Maximum supported ATT_MTU size
@@ -178,7 +178,7 @@
 /**
  * Prepare Write List size in terms of number of packet with ATT_MTU=23 bytes
  */
-#define CFG_BLE_PREPARE_WRITE_LIST_SIZE         ( 0x3A )
+#define CFG_BLE_PREPARE_WRITE_LIST_SIZE         79//( 0x3A )
 
 /**
  * Number of allocated memory blocks
@@ -254,7 +254,7 @@
  * for a CC/CS event, In that case, the notification TL_BLE_HCI_ToNot() is called to indicate
  * to the application a HCI command did not receive its command event within 30s (Default HCI Timeout).
  */
-#define CFG_TLBLE_EVT_QUEUE_LENGTH 5
+#define CFG_TLBLE_EVT_QUEUE_LENGTH 10
 /**
  * This parameter should be set to fit most events received by the HCI layer. It defines the buffer size of each element
  * allocated in the queue of received events and can be used to optimize the amount of RAM allocated by the Memory Manager.
@@ -439,7 +439,7 @@ typedef enum
 typedef enum
 {
     CFG_TASK_ADV_CANCEL_ID,
-    CFG_TASK_SW1_BUTTON_PUSHED_ID,
+    CFG_TASK_MPU_DATA_READY_ID,
     CFG_TASK_HCI_ASYNCH_EVT_ID,
 /* USER CODE BEGIN CFG_Task_Id_With_HCI_Cmd_t */
 

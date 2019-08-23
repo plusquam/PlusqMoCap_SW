@@ -211,11 +211,11 @@ void P2PS_STM_Init(void)
     aci_gatt_add_service(UUID_TYPE_128,
                       (Service_UUID_t *) &uuid16,
                       PRIMARY_SERVICE,
-                      8,
+                      100,
                       &(aPeerToPeerContext.PeerToPeerSvcHdle));
 
     /**
-     *  Add LED Characteristic
+     *  Add Client Info Characteristic
      */
     COPY_P2P_WRITE_CHAR_UUID(uuid16.Char_UUID_128);
     aci_gatt_add_char(aPeerToPeerContext.PeerToPeerSvcHdle,
@@ -229,12 +229,12 @@ void P2PS_STM_Init(void)
                       &(aPeerToPeerContext.P2PWriteClientToServerCharHdle));
 
     /**
-     *   Add Button Characteristic
+     *   Add Notify Sending Characteristic
      */
     COPY_P2P_NOTIFY_UUID(uuid16.Char_UUID_128);
     aci_gatt_add_char(aPeerToPeerContext.PeerToPeerSvcHdle,
                       UUID_TYPE_128, &uuid16,
-                      2,
+                      80,
                       CHAR_PROP_NOTIFY,
                       ATTR_PERMISSION_NONE,
                       GATT_NOTIFY_ATTRIBUTE_WRITE, /* gattEvtMask */
@@ -268,7 +268,7 @@ void P2PS_STM_Init(void)
  * @param  Service_Instance: Instance of the service to which the characteristic belongs
  * 
  */
-tBleStatus P2PS_STM_App_Update_Char(uint16_t UUID, uint8_t *pPayload) 
+tBleStatus P2PS_STM_App_Update_Char(uint16_t UUID,  uint8_t *pPayload, uint8_t dataLength)
 {
   tBleStatus result = BLE_STATUS_INVALID_PARAMS;
   switch(UUID)
@@ -278,7 +278,7 @@ tBleStatus P2PS_STM_App_Update_Char(uint16_t UUID, uint8_t *pPayload)
      result = aci_gatt_update_char_value(aPeerToPeerContext.PeerToPeerSvcHdle,
                              aPeerToPeerContext.P2PNotifyServerToClientCharHdle,
                               0, /* charValOffset */
-                             2, /* charValueLen */
+							  dataLength, /* charValueLen */
                              (uint8_t *)  pPayload);
     
       break;

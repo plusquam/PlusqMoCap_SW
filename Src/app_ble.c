@@ -623,7 +623,7 @@ SVCCTL_UserEvtFlowStatus_t SVCCTL_App_Notification( void *pckt )
 #if(RADIO_ACTIVITY_EVENT != 0)
         case 0x0004:
         /* USER CODE BEGIN RADIO_ACTIVITY_EVENT*/
-        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+//        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
         /* USER CODE END RADIO_ACTIVITY_EVENT*/
         break; /* RADIO_ACTIVITY_EVENT */
 #endif
@@ -763,7 +763,7 @@ static void Ble_Tl_Init( void )
 /**
    * Initialize Default PHY
    */
-  hci_le_set_default_phy(ALL_PHYS_PREFERENCE,TX_2M_PREFERRED,RX_2M_PREFERRED); 
+  hci_le_set_default_phy(ALL_PHYS_PREFERENCE,TX_2M_PREFERRED,RX_2M_PREFERRED);
 
   /**
    * Initialize IO capability

@@ -755,10 +755,10 @@ inv_error_t MPU9250_DMP::allDataUpdate()
     gz = (data[12] << 8) | data[13];
 
     //Mag
-    if (!(data[14] & AKM_DATA_READY) || (data[14] & AKM_DATA_OVERRUN))
+    if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
         return -2;
-    if (data[21] & AKM_OVERFLOW)
-        return -3;
+//    if (data[21] & AKM_OVERFLOW)
+//        return -3;
 
     short mag_sens_adj[3];
     getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);

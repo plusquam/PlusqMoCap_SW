@@ -3276,6 +3276,11 @@ int mpu_reset()
     if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, &data))
         return -1;
 
+//    /* Sleep down chip. */
+//    data = 0x40;
+//    if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, &data))
+//        return -1;
+
     return 0;
 }
 /**

@@ -174,7 +174,7 @@ void P2PS_APP_Notification(P2PS_APP_ConnHandle_Not_evt_t *pNotification)
 void P2PS_APP_Init(void)
 {
 /* USER CODE BEGIN P2PS_APP_Init */
-	SCH_RegTask( CFG_TASK_SW1_BUTTON_PUSHED_ID, P2PS_Send_Notification );
+	SCH_RegTask( CFG_TASK_MPU_DATA_READY_ID, P2PS_Send_Notification );
 
 	/* App Context init */
 	P2P_Server_App_Context.Notification_Status=0;
@@ -235,16 +235,23 @@ void P2PS_APP_LED_BUTTON_context_Init(void){
 void P2PS_Send_Notification(void)
 {
 
-  if(P2P_Server_App_Context.ButtonControl.ButtonStatus == 0x00){
-    P2P_Server_App_Context.ButtonControl.ButtonStatus=0x01;
-  } else {
-    P2P_Server_App_Context.ButtonControl.ButtonStatus=0x00;
-  }
+//  if(P2P_Server_App_Context.ButtonControl.ButtonStatus == 0x00){
+//    P2P_Server_App_Context.ButtonControl.ButtonStatus=0x01;
+//  } else {
+//    P2P_Server_App_Context.ButtonControl.ButtonStatus=0x00;
+//  }
 
    if(P2P_Server_App_Context.Notification_Status){
-    APP_DBG_MSG("-- P2P APPLICATION SERVER  : INFORM CLIENT BUTTON 1 PUSHED \n ");
-    APP_DBG_MSG(" \n\r");
-    P2PS_STM_App_Update_Char(P2P_NOTIFY_CHAR_UUID, (uint8_t *)&P2P_Server_App_Context.ButtonControl);
+//    APP_DBG_MSG("-- P2P APPLICATION SERVER  : INFORM CLIENT BUTTON 1 PUSHED \n ");
+//    APP_DBG_MSG(" \n\r");
+//    P2PS_STM_App_Update_Char(P2P_NOTIFY_CHAR_UUID, (uint8_t *)&P2P_Server_App_Context.ButtonControl);
+	   while(P2PS_STM_App_Update_Char(P2P_NOTIFY_CHAR_UUID, (uint8_t*)mpuDataToBeSend, 75))
+	   {
+		   APP_DBG_MSG("-- P2P APPLICATION SERVER  : NOTIFY ERROR\n ");
+	   }
+
+	   HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+
    } else {
     APP_DBG_MSG("-- P2P APPLICATION SERVER : CAN'T INFORM CLIENT -  NOTIFICATION DISABLED\n ");
    }

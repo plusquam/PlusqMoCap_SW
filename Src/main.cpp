@@ -75,6 +75,9 @@ SpiSlaveHandler_t spiSlavesArray[] =
 };
 #define NUMBER_OF_SENSORS (sizeof(spiSlavesArray)/sizeof(SpiSlaveHandler_t))
 volatile uint8_t isMpuMeasureReady = 0u;
+
+volatile uint8_t mpuDataToBeSend[75];
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -163,9 +166,27 @@ int main(void)
 
 	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
 		IMUs[i].resetDevice();
 	}
 	printf("Sensors reset.\n");
+
+	///// FILL MOCK DATA ///////
+	mpuDataToBeSend[0] = 'S';
+	mpuDataToBeSend[1] = 'T';
+	mpuDataToBeSend[2] = 'T';
+
+	for(unsigned i = 0; i < (75 - 3) / 18; i++)
+	{
+		for(unsigned k = 0; k < 6; k++)
+			mpuDataToBeSend[3 + i * 18 + k] = 'A';
+		for(unsigned k = 0; k < 6; k++)
+			mpuDataToBeSend[3 + i * 18 + k + 6] = 'G';
+		for(unsigned k = 0; k < 6; k++)
+			mpuDataToBeSend[3 + i * 18 + k + 12] = 'M';
+	}
+
+
 
   ////////////////// MEASUREMENT START //////////////////////
   printf("Press SW1 to start.\n");
@@ -741,11 +762,10 @@ void readMpuDataCallback(void)
 			// Check whether magnetometer data is ready
 			if(i == 0)
 			{
-				delay_us(10);
-//				while(!IMUs[i].magDataReady())
-//				{
-//					;
-//				}
+//				if((numOfIters % 5) == 0)
+					SCH_SetTask(1<<CFG_TASK_MPU_DATA_READY_ID, CFG_SCH_PRIO_1);
+
+				delay_ms(1);
 			}
 
 		    // Call update() to update the imu objects sensor data.
@@ -760,7 +780,8 @@ void readMpuDataCallback(void)
 		if(numOfIters >= numOfItersToPrint) {
 			for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 			{
-				printIMUData(i);
+//				printIMUData(i);
+				printf("Sens: %d, A, G, M, T\n", i);
 			}
 
 			HAL_GPIO_TogglePin(GPIOB, LD1_Pin);

@@ -102,6 +102,8 @@ void Error_Handler(void);
 //SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart1;
 extern volatile uint8_t isMpuMeasureReady;
+extern volatile uint8_t mpuDataToBeSend[75];
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
