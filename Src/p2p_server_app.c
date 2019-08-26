@@ -71,6 +71,7 @@ PLACE_IN_SECTION("BLE_APP_CONTEXT") static P2P_Server_App_Context_t P2P_Server_A
 /* USER CODE BEGIN PFP */
 void P2PS_Send_Notification(void);
 void P2PS_APP_LED_BUTTON_context_Init(void);
+static void P2PS_Show_Config(void);
 
 /* USER CODE END PFP */
 
@@ -109,14 +110,14 @@ void P2PS_STM_App_Notification(P2PS_STM_App_Notification_evt_t *pNotification)
 			{
 //				if 2 nd byte of P2P_WRITE characteristic value is 0x00
 				/* Turn the blue LED ON */
-				HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
 				P2P_Server_App_Context.LedControl.Led1=0x01; //LED1 ON
 			}
 			else if(pNotification->DataTransfered.pPayload[1] == 0x00)
 			{
 //				if 2 nd byte of P2P_WRITE characteristic value is 0x01
 				/* Turn the blue LED OFF */
-				HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 				P2P_Server_App_Context.LedControl.Led1=0x00; //LED1 OFF
 			}
     	}
@@ -148,13 +149,14 @@ void P2PS_APP_Notification(P2PS_APP_ConnHandle_Not_evt_t *pNotification)
 /* USER CODE END P2PS_APP_Notification_P2P_Evt_Opcode */
   case PEER_CONN_HANDLE_EVT :
 /* USER CODE BEGIN PEER_CONN_HANDLE_EVT */
-	  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+	  P2P_Server_App_Context.ConnectionHandle = pNotification->ConnectionHandle;
+	  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
 /* USER CODE END PEER_CONN_HANDLE_EVT */
     break;
 
     case PEER_DISCON_HANDLE_EVT :
 /* USER CODE BEGIN PEER_DISCON_HANDLE_EVT */
-    	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+    	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
     	P2PS_APP_LED_BUTTON_context_Init();
 /* USER CODE END PEER_DISCON_HANDLE_EVT */
     break;
@@ -175,6 +177,7 @@ void P2PS_APP_Init(void)
 {
 /* USER CODE BEGIN P2PS_APP_Init */
 	SCH_RegTask( CFG_TASK_MPU_DATA_READY_ID, P2PS_Send_Notification );
+	SCH_RegTask( CFG_TASK_READ_CFG_ID, P2PS_Show_Config );
 
 	/* App Context init */
 	P2P_Server_App_Context.Notification_Status=0;
@@ -185,6 +188,8 @@ void P2PS_APP_Init(void)
 
 /* USER CODE BEGIN FD */
 void P2PS_APP_LED_BUTTON_context_Init(void){
+
+	P2P_Server_App_Context.ConnectionHandle = 0;
 
   #if(P2P_SERVER1 != 0)
   P2P_Server_App_Context.LedControl.Device_Led_Selection=0x01; /* Device1 */
@@ -234,23 +239,13 @@ void P2PS_APP_LED_BUTTON_context_Init(void){
 /* USER CODE BEGIN FD_LOCAL_FUNCTIONS*/
 void P2PS_Send_Notification(void)
 {
-
-//  if(P2P_Server_App_Context.ButtonControl.ButtonStatus == 0x00){
-//    P2P_Server_App_Context.ButtonControl.ButtonStatus=0x01;
-//  } else {
-//    P2P_Server_App_Context.ButtonControl.ButtonStatus=0x00;
-//  }
-
    if(P2P_Server_App_Context.Notification_Status){
-//    APP_DBG_MSG("-- P2P APPLICATION SERVER  : INFORM CLIENT BUTTON 1 PUSHED \n ");
-//    APP_DBG_MSG(" \n\r");
-//    P2PS_STM_App_Update_Char(P2P_NOTIFY_CHAR_UUID, (uint8_t *)&P2P_Server_App_Context.ButtonControl);
-	   while(P2PS_STM_App_Update_Char(P2P_NOTIFY_CHAR_UUID, (uint8_t*)mpuDataToBeSend, 75))
+	   while(P2PS_STM_App_Update_Char(P2P_Server_App_Context.ConnectionHandle, P2P_NOTIFY_CHAR_UUID, (uint8_t*)mpuDataToBeSend, 75))
 	   {
 		   APP_DBG_MSG("-- P2P APPLICATION SERVER  : NOTIFY ERROR\n ");
 	   }
 
-	   HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+	   HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
 
    } else {
     APP_DBG_MSG("-- P2P APPLICATION SERVER : CAN'T INFORM CLIENT -  NOTIFICATION DISABLED\n ");
@@ -259,6 +254,33 @@ void P2PS_Send_Notification(void)
   return;
 }
 
+static void P2PS_Show_Config(void)
+{
+#if(CFG_DEBUG_APP_TRACE != 0)
+	uint16_t supportedMaxTxOctets;
+	uint16_t supportedMaxTxTime;
+	uint16_t supportedMaxRxOctets;
+	uint16_t supportedMaxRxTime;
+	tBleStatus result = hci_le_read_maximum_data_length(&supportedMaxTxOctets,
+														&supportedMaxTxTime,
+														&supportedMaxRxOctets,
+														&supportedMaxRxTime);
+	if(!result)
+	  APP_DBG_MSG("-- CONFIG: %d, %d, %d, %d\n", supportedMaxTxOctets,
+				  supportedMaxTxTime, supportedMaxRxOctets, supportedMaxRxTime);
+	else
+		APP_DBG_MSG("-- hci_le_read_maximum_data_length error\n");
+
+	uint8_t TX_PHY;
+	uint8_t RX_PHY;
+	result = hci_le_read_phy(P2P_Server_App_Context.ConnectionHandle, &TX_PHY, &RX_PHY);
+	if(!result)
+	  APP_DBG_MSG("-- PHY: %d, %d\n", TX_PHY, RX_PHY);
+	else
+		APP_DBG_MSG("-- hci_le_read_phy error\n");
+
+	#endif
+}
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

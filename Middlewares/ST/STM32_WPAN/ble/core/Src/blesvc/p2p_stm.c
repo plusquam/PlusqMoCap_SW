@@ -166,6 +166,21 @@ static SVCCTL_EvtAckStatus_t PeerToPeer_Event_Handler(void *Event)
         }
         break;
 
+        case EVT_BLUE_ATT_EXCHANGE_MTU_RESP:
+        {
+			aci_att_exchange_mtu_resp_event_rp0 *pr = (void*)blue_evt->data;
+#if(CFG_DEBUG_APP_TRACE != 0)
+			APP_DBG_MSG("-- GATT : EVT_BLUE_ATT_EXCHANGE_MTU_RESP \n");
+			APP_DBG_MSG("\n");
+#endif
+			tBleStatus result = hci_le_set_data_length(pr->Connection_Handle, pr->Server_RX_MTU, 2120);
+			#if(CFG_DEBUG_APP_TRACE != 0)
+			  if(result)
+				APP_DBG_MSG("-- hci_le_set_data_length error\n");
+			#endif
+        }
+        break; /*end EVT_BLUE_ATT_EXCHANGE_MTU_RESP*/
+
         default:
           break;
       }
@@ -211,7 +226,7 @@ void P2PS_STM_Init(void)
     aci_gatt_add_service(UUID_TYPE_128,
                       (Service_UUID_t *) &uuid16,
                       PRIMARY_SERVICE,
-                      100,
+                      12,
                       &(aPeerToPeerContext.PeerToPeerSvcHdle));
 
     /**
@@ -234,7 +249,7 @@ void P2PS_STM_Init(void)
     COPY_P2P_NOTIFY_UUID(uuid16.Char_UUID_128);
     aci_gatt_add_char(aPeerToPeerContext.PeerToPeerSvcHdle,
                       UUID_TYPE_128, &uuid16,
-                      80,
+                      100,
                       CHAR_PROP_NOTIFY,
                       ATTR_PERMISSION_NONE,
                       GATT_NOTIFY_ATTRIBUTE_WRITE, /* gattEvtMask */
@@ -268,18 +283,36 @@ void P2PS_STM_Init(void)
  * @param  Service_Instance: Instance of the service to which the characteristic belongs
  * 
  */
-tBleStatus P2PS_STM_App_Update_Char(uint16_t UUID,  uint8_t *pPayload, uint8_t dataLength)
+tBleStatus P2PS_STM_App_Update_Char(uint16_t connectionHandle, uint16_t UUID,  uint8_t *pPayload, uint8_t dataLength)
 {
   tBleStatus result = BLE_STATUS_INVALID_PARAMS;
   switch(UUID)
   {
     case P2P_NOTIFY_CHAR_UUID:
       
-     result = aci_gatt_update_char_value(aPeerToPeerContext.PeerToPeerSvcHdle,
-                             aPeerToPeerContext.P2PNotifyServerToClientCharHdle,
-                              0, /* charValOffset */
-							  dataLength, /* charValueLen */
-                             (uint8_t *)  pPayload);
+//     result = aci_gatt_update_char_value(aPeerToPeerContext.PeerToPeerSvcHdle,
+//                             aPeerToPeerContext.P2PNotifyServerToClientCharHdle,
+//                              0, /* charValOffset */
+//							  dataLength, /* charValueLen */
+//                             (uint8_t *)  pPayload);
+     result = aci_gatt_update_char_value_ext(
+    		 	 	 	 	 	 	 	 	 connectionHandle,
+											 aPeerToPeerContext.PeerToPeerSvcHdle,
+											 aPeerToPeerContext.P2PNotifyServerToClientCharHdle,
+											 0x01, //Notification
+											 75, //Char_Length
+											 0, //Value_Offset
+											 dataLength,
+											 pPayload);
+//     result = aci_gatt_update_char_value_ext(
+//											 0,
+//											 aPeerToPeerContext.PeerToPeerSvcHdle,
+//											 aPeerToPeerContext.P2PNotifyServerToClientCharHdle,
+//											 0x01, //Notification
+//											 40, //Char_Length
+//											 20, //Value_Offset
+//											 dataLength,
+//											 pPayload+20);
     
       break;
 

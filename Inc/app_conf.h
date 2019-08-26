@@ -129,8 +129,8 @@
   /*  L2CAP Connection Update request parameters used for test only with smart Phone */
 #define L2CAP_REQUEST_NEW_CONN_PARAM             1
 
-#define L2CAP_INTERVAL_MIN              (7.5f) /* ms */
-#define L2CAP_INTERVAL_MAX              (10.f) /* ms */
+#define L2CAP_INTERVAL_MIN              (50.f) /* ms */
+#define L2CAP_INTERVAL_MAX              (50.f) /* ms */
 #define L2CAP_SLAVE_LATENCY             0x0000
 #define L2CAP_TIMEOUT_MULTIPLIER        0x1F4
 
@@ -141,13 +141,13 @@
  * Maximum number of simultaneous connections that the device will support.
  * Valid values are from 1 to 8
  */
-#define CFG_BLE_NUM_LINK            8
+#define CFG_BLE_NUM_LINK            2
 
 /**
  * Maximum number of Services that can be stored in the GATT database.
  * Note that the GAP and GATT services are automatically added so this parameter should be 2 plus the number of user services
  */
-#define CFG_BLE_NUM_GATT_SERVICES   8
+#define CFG_BLE_NUM_GATT_SERVICES   4
 
 /**
  * Maximum number of Attributes
@@ -156,12 +156,12 @@
  * Note that certain characteristics and relative descriptors are added automatically during device initialization
  * so this parameters should be 9 plus the number of user Attributes
  */
-#define CFG_BLE_NUM_GATT_ATTRIBUTES 150
+#define CFG_BLE_NUM_GATT_ATTRIBUTES 25
 
 /**
  * Maximum supported ATT_MTU size
  */
-#define CFG_BLE_MAX_ATT_MTU             (156)
+#define CFG_BLE_MAX_ATT_MTU             (250)
 
 /**
  * Size of the storage area for Attribute values
@@ -173,17 +173,66 @@
  *  - 2, if extended properties is used
  *  The total amount of memory needed is the sum of the above quantities for each attribute.
  */
-#define CFG_BLE_ATT_VALUE_ARRAY_SIZE    (1344)
+#define CFG_BLE_ATT_VALUE_ARRAY_SIZE    (1500)
 
+/////////////////////////////// CFG_BLE_PREPARE_WRITE_LIST_SIZE //////////////////////////////
+
+/**
+* DEFAULT_ATT_MTU: minimum mtu value that GATT must support.
+* 5.2.1 ATT_MTU, BLUETOOTH SPECIFICATION Version 4.2 [Vol 3, Part G]
+*/
+#define DEFAULT_ATT_MTU		(23)
+/**
+* DEFAULT_MAX_ATT_SIZE: maximum attribute size.
+*/
+#define DEFAULT_MAX_ATT_SIZE	(512)
+
+/**
+* PREP_WRITE_X_ATT(max_att): compute how many Prepare Write Request are needed
+* to write a characteristic with size max_att when the used ATT_MTU value is
+* equal to DEFAULT_ATT_MTU (23).
+*/
+#define PREP_WRITE_X_ATT(max_att)	(DIVC(max_att, DEFAULT_ATT_MTU - 5U) * 2)
 /**
  * Prepare Write List size in terms of number of packet with ATT_MTU=23 bytes
  */
-#define CFG_BLE_PREPARE_WRITE_LIST_SIZE         79//( 0x3A )
+#define CFG_BLE_PREPARE_WRITE_LIST_SIZE         PREP_WRITE_X_ATT(DEFAULT_MAX_ATT_SIZE)//( 0x3A )
+
+/////////////////////////////// END OF CFG_BLE_PREPARE_WRITE_LIST_SIZE //////////////////////////////
+
+/////////////////////////////// CFG_BLE_MBLOCK_COUNT //////////////////////////////
+#define MEM_BLOCK_SIZE	(32)
+
+/**
+* MEM_BLOCK_X_MTU (mtu): compute how many memory blocks are needed to compose an ATT
+* Packet with ATT_MTU = mtu.
+* 7.2 FRAGMENTATION AND RECOMBINATION, BLUETOOTH SPECIFICATION Version 4.2
+* [Vol 3, Part A]
+*/
+#define MEM_BLOCK_X_TX(mtu)				(DIVC((mtu) + 4U, MEM_BLOCK_SIZE) + 1U)
+#define MEM_BLOCK_X_RX(mtu, n_link)		((DIVC((mtu) + 4U, MEM_BLOCK_SIZE) + 2U) * (n_link) + 1)
+#define MEM_BLOCK_X_MTU(mtu, n_link)	(MEM_BLOCK_X_TX(mtu) + MEM_BLOCK_X_RX(mtu, (n_link)))
+
+/**
+* Minimum number of blocks required for secure connections
+*/
+#define MBLOCKS_SECURE_CONNECTIONS	(4)
+
+/**
+* MBLOCKS_CALC(pw, mtu, n_link): minimum number of buffers needed by the stack.
+* This is the minimum racomanded value and depends on:
+* - pw: size of Prepare Write List
+* - mtu: ATT_MTU size
+* - n_link: maximum number of simultaneous connections
+*/
+#define MBLOCKS_CALC(pw, mtu, n_link)	((pw) + MAX(MEM_BLOCK_X_MTU(mtu, n_link), (MBLOCKS_SECURE_CONNECTIONS)))
 
 /**
  * Number of allocated memory blocks
  */
-#define CFG_BLE_MBLOCK_COUNT            ( 0x79 )
+#define CFG_BLE_MBLOCK_COUNT            MBLOCKS_CALC(CFG_BLE_PREPARE_WRITE_LIST_SIZE, CFG_BLE_MAX_ATT_MTU, CFG_BLE_NUM_LINK) + 30 /*(for better performance)*/ //( 0x79 )
+
+/////////////////////////////// END OF CFG_BLE_MBLOCK_COUNT //////////////////////////////
 
 /**
  * Enable or disable the Extended Packet length feature. Valid values are 0 or 1.
@@ -193,7 +242,7 @@
 /**
  * Sleep clock accuracy in Slave mode (ppm value)
  */
-#define CFG_BLE_SLAVE_SCA   500
+#define CFG_BLE_SLAVE_SCA   50
 
 /**
  * Sleep clock accuracy in Master mode
@@ -206,14 +255,14 @@
  * 6 : 21 ppm to 30 ppm
  * 7 : 0 ppm to 20 ppm
  */
-#define CFG_BLE_MASTER_SCA   0
+#define CFG_BLE_MASTER_SCA   5
 
 /**
  *  Source for the 32 kHz slow speed clock
  *  1 : internal RO
  *  0 : external crystal ( no calibration )
  */
-#define CFG_BLE_LSE_SOURCE  1
+#define CFG_BLE_LSE_SOURCE  0
 
 /**
  * Start up time of the high speed (16 or 32 MHz) crystal oscillator in units of 625/256 us (~2.44 us)
@@ -254,7 +303,7 @@
  * for a CC/CS event, In that case, the notification TL_BLE_HCI_ToNot() is called to indicate
  * to the application a HCI command did not receive its command event within 30s (Default HCI Timeout).
  */
-#define CFG_TLBLE_EVT_QUEUE_LENGTH 10
+#define CFG_TLBLE_EVT_QUEUE_LENGTH 7
 /**
  * This parameter should be set to fit most events received by the HCI layer. It defines the buffer size of each element
  * allocated in the queue of received events and can be used to optimize the amount of RAM allocated by the Memory Manager.
@@ -442,7 +491,7 @@ typedef enum
     CFG_TASK_MPU_DATA_READY_ID,
     CFG_TASK_HCI_ASYNCH_EVT_ID,
 /* USER CODE BEGIN CFG_Task_Id_With_HCI_Cmd_t */
-
+	CFG_TASK_READ_CFG_ID,
 /* USER CODE END CFG_Task_Id_With_HCI_Cmd_t */
     CFG_LAST_TASK_ID_WITH_HCICMD,                                               /**< Shall be LAST in the list */
 } CFG_Task_Id_With_HCI_Cmd_t;

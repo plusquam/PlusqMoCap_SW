@@ -209,11 +209,6 @@ int main(void)
   printf("Fifo reset done.\n");
 #endif
 
-  ////////////////// RESET SYSTICK /////////////////////////
-//  __disable_irq();
-//  uwTick = 0lu;
-//  __enable_irq();
-
   ////////////////// SET MPU9250 INTERRUPT /////////////////////////
   SCH_RegTask( CFG_TASK_MPU9250_INT_ID, readMpuDataCallback );
   set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
@@ -223,8 +218,17 @@ int main(void)
   isMpuMeasureReady = 1u;
   __set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
   ////////////////// LOOP START ///////////////////////////
+
+  uint32_t config_read_iter = 0;
+
+
   while (1)
   {
+	if((++config_read_iter % 1000000u) == 0) {
+		SCH_SetTask(1<<CFG_TASK_READ_CFG_ID, CFG_SCH_PRIO_1);
+		config_read_iter = 0u;
+	}
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -540,6 +544,24 @@ void SetupMPUSensors(void)
 		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
 
 		// Call IMUs[i].begin() to verify communication and initialize
+		if (IMUs[i].resetDevice() != INV_SUCCESS)
+		{
+			while (1)
+			{
+				printf("Unable to reset MPU-9250 nr %d\n", i);
+				HAL_Delay(10);
+			}
+		}
+	}
+
+	HAL_Delay(100);
+
+	////////////////// SETUP /////////////////////////////
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+
+		// Call IMUs[i].begin() to verify communication and initialize
 		if (IMUs[i].begin() != INV_SUCCESS)
 		{
 			while (1)
@@ -762,7 +784,7 @@ void readMpuDataCallback(void)
 			// Check whether magnetometer data is ready
 			if(i == 0)
 			{
-//				if((numOfIters % 5) == 0)
+				if((numOfIters % 5) == 0)
 					SCH_SetTask(1<<CFG_TASK_MPU_DATA_READY_ID, CFG_SCH_PRIO_1);
 
 				delay_ms(1);
@@ -771,7 +793,7 @@ void readMpuDataCallback(void)
 		    // Call update() to update the imu objects sensor data.
 //			if(IMUs[i].update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS) != INV_SUCCESS)
 			if(IMUs[i].allDataUpdate() != INV_SUCCESS)
-				printf("IMU data read error!\n");
+				printf("IMU nr %d data read error!\n", i);
 #endif
 		}
 
