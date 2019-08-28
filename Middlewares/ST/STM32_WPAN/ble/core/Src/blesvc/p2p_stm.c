@@ -283,37 +283,18 @@ void P2PS_STM_Init(void)
  * @param  Service_Instance: Instance of the service to which the characteristic belongs
  * 
  */
-tBleStatus P2PS_STM_App_Update_Char(uint16_t connectionHandle, uint16_t UUID,  uint8_t *pPayload, uint8_t dataLength)
+tBleStatus P2PS_STM_App_Update_Char(uint16_t UUID,  uint8_t *pPayload, uint8_t dataLength)
 {
   tBleStatus result = BLE_STATUS_INVALID_PARAMS;
   switch(UUID)
   {
     case P2P_NOTIFY_CHAR_UUID:
       
-//     result = aci_gatt_update_char_value(aPeerToPeerContext.PeerToPeerSvcHdle,
-//                             aPeerToPeerContext.P2PNotifyServerToClientCharHdle,
-//                              0, /* charValOffset */
-//							  dataLength, /* charValueLen */
-//                             (uint8_t *)  pPayload);
-     result = aci_gatt_update_char_value_ext(
-    		 	 	 	 	 	 	 	 	 connectionHandle,
-											 aPeerToPeerContext.PeerToPeerSvcHdle,
-											 aPeerToPeerContext.P2PNotifyServerToClientCharHdle,
-											 0x01, //Notification
-											 75, //Char_Length
-											 0, //Value_Offset
-											 dataLength,
-											 pPayload);
-//     result = aci_gatt_update_char_value_ext(
-//											 0,
-//											 aPeerToPeerContext.PeerToPeerSvcHdle,
-//											 aPeerToPeerContext.P2PNotifyServerToClientCharHdle,
-//											 0x01, //Notification
-//											 40, //Char_Length
-//											 20, //Value_Offset
-//											 dataLength,
-//											 pPayload+20);
-    
+     result = aci_gatt_update_char_value(aPeerToPeerContext.PeerToPeerSvcHdle,
+                             	 	 	 aPeerToPeerContext.P2PNotifyServerToClientCharHdle,
+										 0, /* charValOffset */
+										 dataLength, /* charValueLen */
+										 pPayload);
       break;
 
     default:

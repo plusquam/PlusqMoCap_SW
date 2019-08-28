@@ -240,7 +240,7 @@ void P2PS_APP_LED_BUTTON_context_Init(void){
 void P2PS_Send_Notification(void)
 {
    if(P2P_Server_App_Context.Notification_Status){
-	   while(P2PS_STM_App_Update_Char(P2P_Server_App_Context.ConnectionHandle, P2P_NOTIFY_CHAR_UUID, (uint8_t*)mpuDataToBeSend, 75))
+	   while(P2PS_STM_App_Update_Char(P2P_NOTIFY_CHAR_UUID, (uint8_t*)mpuDataToBeSend, 75))
 	   {
 		   APP_DBG_MSG("-- P2P APPLICATION SERVER  : NOTIFY ERROR\n ");
 	   }
@@ -279,6 +279,13 @@ static void P2PS_Show_Config(void)
 	else
 		APP_DBG_MSG("-- hci_le_read_phy error\n");
 
+	uint16_t	HC_LE_ACL_Data_Packet_Length;
+	uint8_t 	HC_Total_Num_LE_ACL_Data_Packets;
+	result = hci_le_read_buffer_size(&HC_LE_ACL_Data_Packet_Length, &HC_Total_Num_LE_ACL_Data_Packets);
+	if(!result)
+	  APP_DBG_MSG("-- Packet length: %d, Packets nr %d\n", HC_LE_ACL_Data_Packet_Length, HC_Total_Num_LE_ACL_Data_Packets);
+	else
+		APP_DBG_MSG("-- hci_le_read_buffer_size error\n");
 	#endif
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/

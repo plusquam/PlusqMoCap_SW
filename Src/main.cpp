@@ -211,16 +211,16 @@ int main(void)
 
   ////////////////// SET MPU9250 INTERRUPT /////////////////////////
   SCH_RegTask( CFG_TASK_MPU9250_INT_ID, readMpuDataCallback );
+
   set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
   IMUs[0].enableInterrupt(1);
   uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
   __disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
   isMpuMeasureReady = 1u;
   __set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
+
   ////////////////// LOOP START ///////////////////////////
-
   uint32_t config_read_iter = 0;
-
 
   while (1)
   {
