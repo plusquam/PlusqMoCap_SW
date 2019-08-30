@@ -23,6 +23,7 @@ extern "C" {
 #include "util/inv_mpu.h"
 }
 #include <math.h>
+#include <string.h>
 
 static unsigned char mpu9250_orientation;
 static unsigned char tap_count;
@@ -732,7 +733,7 @@ bool MPU9250_DMP::magDataReady()
 	return isReady;
 }
 
-inv_error_t MPU9250_DMP::allDataUpdate()
+inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offset)
 {
 	constexpr unsigned char DATA_SIZE = (sizeof(ax) * 3) + sizeof(short) + (sizeof(gx) * 3) + 8;
 	// Data frame: 3acc + temp + 3gyro + 8B mag data
@@ -741,35 +742,69 @@ inv_error_t MPU9250_DMP::allDataUpdate()
 	if(mpu_read_multi_reg(MPU9250_ACCEL_XOUT_H, data, DATA_SIZE))
 		return INV_ERROR;
 
-	// Accel
-    ax = (data[0] << 8) | data[1];
-    ay = (data[2] << 8) | data[3];
-    az = (data[4] << 8) | data[5];
+	if(buffer == NULL) {
+		// Accel
+		ax = (data[0] << 8) | data[1];
+		ay = (data[2] << 8) | data[3];
+		az = (data[4] << 8) | data[5];
 
-    // Temperature // don't care now
-//    temperature = TODO
+		// Temperature // don't care now
+	//    temperature = TODO
 
-    //Gyro
-    gx = (data[8] << 8) | data[9];
-    gy = (data[10] << 8) | data[11];
-    gz = (data[12] << 8) | data[13];
+		//Gyro
+		gx = (data[8] << 8) | data[9];
+		gy = (data[10] << 8) | data[11];
+		gz = (data[12] << 8) | data[13];
 
-    //Mag
-    if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
-        return -2;
-//    if (data[21] & AKM_OVERFLOW)
-//        return -3;
+		//Mag
+		if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
+			return -2;
+	//    if (data[21] & AKM_OVERFLOW)
+	//        return -3;
 
-    short mag_sens_adj[3];
-    getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+		short mag_sens_adj[3];
+		getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
 
-    mx = (data[16] << 8) | data[15];
-    my = (data[18] << 8) | data[17];
-    mz = (data[20] << 8) | data[19];
+		mx = (data[16] << 8) | data[15];
+		my = (data[18] << 8) | data[17];
+		mz = (data[20] << 8) | data[19];
 
-    mx = ((long)mx * mag_sens_adj[0]) >> 8;
-    my = ((long)my * mag_sens_adj[1]) >> 8;
-    mz = ((long)mz * mag_sens_adj[2]) >> 8;
+		mx = ((long)mx * mag_sens_adj[0]) >> 8;
+		my = ((long)my * mag_sens_adj[1]) >> 8;
+		mz = ((long)mz * mag_sens_adj[2]) >> 8;
+	}
+	else
+	{
+		if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
+			return -2;
+
+		unsigned char *buffer_with_offset = buffer + offset;
+
+		// Acc
+		memcpy(buffer_with_offset, data, sizeof(ax) * 3);
+
+		//Gyro
+		memcpy(buffer_with_offset + 6, data + 8, sizeof(gx) * 3);
+
+		// Mag
+		short temp_mx = (data[16] << 8) | data[15];
+		short temp_my = (data[18] << 8) | data[17];
+		short temp_mz = (data[20] << 8) | data[19];
+
+		short mag_sens_adj[3];
+		getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+
+		temp_mx = ((long)temp_mx * mag_sens_adj[0]) >> 8;
+		temp_my = ((long)temp_my * mag_sens_adj[1]) >> 8;
+		temp_mz = ((long)temp_mz * mag_sens_adj[2]) >> 8;
+
+		buffer_with_offset[12] = (unsigned char)(temp_mx >> 8);
+		buffer_with_offset[13] = (unsigned char)temp_mx;
+		buffer_with_offset[14] = (unsigned char)(temp_mx >> 8);
+		buffer_with_offset[15] = (unsigned char)temp_mx;
+		buffer_with_offset[16] = (unsigned char)(temp_mx >> 8);
+		buffer_with_offset[17] = (unsigned char)temp_mx;
+	}
 
 	return INV_SUCCESS;
 }

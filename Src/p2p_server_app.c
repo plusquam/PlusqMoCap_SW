@@ -105,23 +105,21 @@ void P2PS_STM_App_Notification(P2PS_STM_App_Notification_evt_t *pNotification)
       
     case P2PS_STM_WRITE_EVT:
 /* USER CODE BEGIN P2PS_STM_WRITE_EVT */
-    	if(pNotification->DataTransfered.pPayload[0] == 0x01) {
-			if(pNotification->DataTransfered.pPayload[1] == 0x01)
-			{
-//				if 2 nd byte of P2P_WRITE characteristic value is 0x00
-				/* Turn the blue LED ON */
-				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-				P2P_Server_App_Context.LedControl.Led1=0x01; //LED1 ON
-			}
-			else if(pNotification->DataTransfered.pPayload[1] == 0x00)
-			{
-//				if 2 nd byte of P2P_WRITE characteristic value is 0x01
-				/* Turn the blue LED OFF */
-				HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-				P2P_Server_App_Context.LedControl.Led1=0x00; //LED1 OFF
-			}
+    {
+    	if(pNotification->DataTransfered.Length == 1)
+    	{
+    		switch(pNotification->DataTransfered.pPayload[0])
+    		{
+    		case 'S': // Start/Stop measure command
+    		case 's':
+    		{
+    			runMeasurement = !runMeasurement;
+    			APP_DBG_MSG("-- Start/Stop measure command got\n\n");
+    		}
+    			break;
+    		}
     	}
-
+    }
 /* USER CODE END P2PS_STM_WRITE_EVT */
       break;
 

@@ -28,6 +28,7 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
+#include <stdbool.h>
 #include "stm32wbxx_hal.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -100,10 +101,10 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 
 //SPI_HandleTypeDef hspi1;
-extern UART_HandleTypeDef huart1;
-extern volatile uint8_t isMpuMeasureReady;
-extern volatile uint8_t mpuDataToBeSend[75];
-
+extern UART_HandleTypeDef 	huart1;
+extern volatile uint8_t 	isMpuMeasureReady;
+extern volatile uint8_t 	mpuDataToBeSend[75];
+extern volatile bool	runMeasurement;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

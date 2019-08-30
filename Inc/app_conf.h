@@ -129,8 +129,8 @@
   /*  L2CAP Connection Update request parameters used for test only with smart Phone */
 #define L2CAP_REQUEST_NEW_CONN_PARAM             1
 
-#define L2CAP_INTERVAL_MIN              (50.f) /* ms */
-#define L2CAP_INTERVAL_MAX              (50.f) /* ms */
+#define L2CAP_INTERVAL_MIN              (7.5f) /* ms */
+#define L2CAP_INTERVAL_MAX              (10.f) /* ms */
 #define L2CAP_SLAVE_LATENCY             0x0000
 #define L2CAP_TIMEOUT_MULTIPLIER        0x1F4
 
@@ -161,7 +161,7 @@
 /**
  * Maximum supported ATT_MTU size
  */
-#define CFG_BLE_MAX_ATT_MTU             (250)
+#define CFG_BLE_MAX_ATT_MTU             (90)
 
 /**
  * Size of the storage area for Attribute values
