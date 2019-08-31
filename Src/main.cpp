@@ -49,7 +49,8 @@ typedef struct
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define NUMBER_OF_SENSORS	3
+#define PRINT_FULL_DATA		0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -75,12 +76,15 @@ SpiSlaveHandler_t spiSlavesArray[] =
 	[2] = {.number = 2, .port = SPI1_CS_2_GPIO_Port, .pin = SPI1_CS_2_Pin}
 };
 
-//#define NUMBER_OF_SENSORS (sizeof(spiSlavesArray)/sizeof(SpiSlaveHandler_t))
-#define NUMBER_OF_SENSORS	3
+#ifndef NUMBER_OF_SENSORS
+#define NUMBER_OF_SENSORS (sizeof(spiSlavesArray)/sizeof(SpiSlaveHandler_t))
+#endif
 
-volatile uint8_t 		isMpuMeasureReady = 0u;
-volatile uint8_t 		mpuDataToBeSend[75];
-volatile bool	runMeasurement = false;
+static MPU9250_DMP 		IMUs[NUMBER_OF_SENSORS];
+volatile uint8_t 	isMpuMeasureReady = 0u;
+volatile uint8_t 	mpuDataToBeSend[75];
+volatile bool		runMeasurement = false;
+volatile uint16_t	timestampInterval = 0u;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -92,9 +96,9 @@ static void MX_SPI1_Init(void);
 static void MX_RF_Init(void);
 static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
-
-MPU9250_DMP IMUs[NUMBER_OF_SENSORS];
+#if PRINT_FULL_DATA
 static void printIMUData(uint8_t sensor_number);
+#endif
 static void readMpuDataCallback(void);
 static void SetupMPUSensors(void);
 static void MeasurementLoop(void);
@@ -571,6 +575,7 @@ void SetupMPUSensors(void)
 	printf("Setup done.\n");
 }
 
+#if PRINT_FULL_DATA
 void printIMUData(uint8_t sensor_number)
 {
 #if MPU_DMP_DATA_ENABLE
@@ -642,6 +647,7 @@ void printIMUData(uint8_t sensor_number)
 	// Time
 	printf("Time: %lu ms\n", IMUs[sensor_number].time);
 }
+#endif
 
 extern "C" {
 #include "stm32_mpu9250_spi.h"
@@ -691,18 +697,6 @@ void MeasurementLoop(void)
 
 	///// FILL MOCK DATA ///////
 	mpuDataToBeSend[0] = 'S';
-	mpuDataToBeSend[1] = 'T';
-	mpuDataToBeSend[2] = 'T';
-
-	for(unsigned i = 0; i < (75 - 3) / 18; i++)
-	{
-		for(unsigned k = 0; k < 6; k++)
-			mpuDataToBeSend[3 + i * 18 + k] = 'A';
-		for(unsigned k = 0; k < 6; k++)
-			mpuDataToBeSend[3 + i * 18 + k + 6] = 'G';
-		for(unsigned k = 0; k < 6; k++)
-			mpuDataToBeSend[3 + i * 18 + k + 12] = 'M';
-	}
 
 	////////////////// MEASUREMENT START //////////////////////
 	printf("Waiting for measurement start command...\n");
@@ -733,16 +727,9 @@ void MeasurementLoop(void)
 	isMpuMeasureReady = 1u;
 	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
-	uint32_t config_read_iter = 0;
-
 	////////////////// MEASUREMENT LOOP START ///////////////////////////
 	while(runMeasurement)
 	{
-		if((++config_read_iter % 1000000u) == 0) {
-			SCH_SetTask(1<<CFG_TASK_READ_CFG_ID, CFG_SCH_PRIO_1);
-			config_read_iter = 0u;
-		}
-
 		SCH_Run(SCH_DEFAULT);
 	}
 
@@ -767,19 +754,20 @@ void readMpuDataCallback(void)
 	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
 	if(isMpuMeasureReady)
 	{
+		// Get timestamp
+		mpuDataToBeSend[1] = (uint8_t)(timestampInterval >> 8);
+		mpuDataToBeSend[2] = (uint8_t)timestampInterval;
+
 		isMpuMeasureReady = 0u;
 		__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
+#if PRINT_FULL_DATA
 		static uint8_t numOfIters = 0u;
 		static constexpr uint8_t numOfItersToPrint = MPU_SAMPLE_RATE; // value set for 1Hz printf refresh rate
+#endif
 
-		// Get timestamp
-		unsigned long timestamp;
-	    get_ms(&timestamp);
-	    for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-	    {
-	    	IMUs[i].time = timestamp;
-	    }
+		// Wait until magnetometer data is ready
+		delay_ms(1);
 
 		for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 		{
@@ -805,14 +793,6 @@ void readMpuDataCallback(void)
 				printf("DMP update fifo read error!\n");
 			}
 #else
-			// Check whether magnetometer data is ready
-			if(i == 0)
-			{
-//				if((numOfIters % 5) == 0)
-					SCH_SetTask(1<<CFG_TASK_MPU_DATA_READY_ID, CFG_SCH_PRIO_1);
-
-				delay_ms(1);
-			}
 
 		    // Call update() to update the imu objects sensor data.
 //			if(IMUs[i].update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS) != INV_SUCCESS)
@@ -826,30 +806,30 @@ void readMpuDataCallback(void)
 #if(NUMBER_OF_SENSORS < 4)
 		fillMissingData();
 #endif
+		// Send measurements
+		SCH_SetTask(1<<CFG_TASK_MPU_DATA_READY_ID, CFG_SCH_PRIO_1);
 
+#if PRINT_FULL_DATA
 		numOfIters++;
 
 		if(numOfIters >= numOfItersToPrint) {
 			for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 			{
-//				printIMUData(i);
-				printf("Sens: %d, A, G, M, T\n", i);
-			}
 
-			HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
+				printIMUData(i);
+
+			}
 			numOfIters = 0u;
 			printf("\n");
 		}
+#endif
 
 		primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
 		__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
 		isMpuMeasureReady = 1u;
-		__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 	}
-	else
-	{
-		__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
-	}
+
+	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 }
 
 /* USER CODE END 4 */

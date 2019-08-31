@@ -62,7 +62,7 @@ PLACE_IN_SECTION("MB_MEM2") ALIGN(4) static uint8_t SystemSpareEvtBuffer[sizeof(
 PLACE_IN_SECTION("MB_MEM2") ALIGN(4) static uint8_t BleSpareEvtBuffer[sizeof(TL_PacketHeader_t) + TL_EVT_HDR_SIZE + 255];
 
 /* USER CODE BEGIN PV */
-
+static volatile uint32_t	previousTimestamp = 0u;
 /* USER CODE END PV */
 
 /* Private functions prototypes-----------------------------------------------*/
@@ -118,7 +118,20 @@ void HAL_GPIO_EXTI_Callback( uint16_t GPIO_Pin )
 			break;
 		case MPU_INT_Pin:
 			if(isMpuMeasureReady)
+			{
+				uint32_t currTimestamp = HAL_GetTick();
+
+				if(previousTimestamp < currTimestamp) {
+					timestampInterval = (uint16_t)(currTimestamp - previousTimestamp);
+				}
+				else {
+					// Timer overflow
+					timestampInterval = (uint16_t)(currTimestamp + (	~((uint32_t)0u) - previousTimestamp));
+				}
+
+				previousTimestamp = currTimestamp;
 				SCH_SetTask(1<<CFG_TASK_MPU9250_INT_ID, CFG_SCH_PRIO_0);
+			}
 //			else
 //				printf("NotReady\n");
 			break;
