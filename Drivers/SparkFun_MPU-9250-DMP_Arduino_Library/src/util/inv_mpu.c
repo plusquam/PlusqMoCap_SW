@@ -3271,15 +3271,42 @@ int mpu_reset()
 {
     unsigned char data;
 
+#ifdef AK89xx_SECONDARY
+    /* Reset magnetometer device. */
+    data = 0x01;
+    if (i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL2, 1, &data))
+        return -1;
+#endif
+
     /* Reset device. */
     data = BIT_RESET;
     if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, &data))
         return -1;
 
-//    /* Sleep down chip. */
-//    data = 0x40;
-//    if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, &data))
-//        return -1;
+    return 0;
+}
+
+int mpu_set_slave4_interrupt()
+{
+	unsigned char data;
+
+	// Setting SLV4_DONE_INT_EN bit
+	if (i2c_read(st.hw->addr, MPU9250_I2C_SLV4_CTRL, 1, &data))
+	        return -1;
+
+	data |= (1 << 6);
+
+	if (i2c_write(st.hw->addr, MPU9250_I2C_SLV4_CTRL, 1, &data))
+	        return -1;
+
+	// Setting WAIT_FOR_ES bit
+    if (i2c_read(st.hw->addr, MPU9250_I2C_MST_CTRL, 1, &data))
+        return -1;
+
+	data |= (1 << 6);
+
+	if (i2c_write(st.hw->addr, MPU9250_I2C_MST_CTRL, 1, &data))
+	        return -1;
 
     return 0;
 }

@@ -62,7 +62,6 @@ PLACE_IN_SECTION("MB_MEM2") ALIGN(4) static uint8_t SystemSpareEvtBuffer[sizeof(
 PLACE_IN_SECTION("MB_MEM2") ALIGN(4) static uint8_t BleSpareEvtBuffer[sizeof(TL_PacketHeader_t) + TL_EVT_HDR_SIZE + 255];
 
 /* USER CODE BEGIN PV */
-static volatile uint32_t	previousTimestamp = 0u;
 /* USER CODE END PV */
 
 /* Private functions prototypes-----------------------------------------------*/
@@ -119,14 +118,21 @@ void HAL_GPIO_EXTI_Callback( uint16_t GPIO_Pin )
 		case MPU_INT_Pin:
 			if(isMpuMeasureReady)
 			{
-				uint32_t currTimestamp = HAL_GetTick();
+				static volatile uint32_t	previousTimestamp = 0u;
+				uint32_t	currTimestamp = HAL_GetTick();
 
-				if(previousTimestamp < currTimestamp) {
-					timestampInterval = (uint16_t)(currTimestamp - previousTimestamp);
+				if(firstMeasurementLoop) {
+					timestampInterval = 0u;
+					firstMeasurementLoop = false;
 				}
 				else {
-					// Timer overflow
-					timestampInterval = (uint16_t)(currTimestamp + (	~((uint32_t)0u) - previousTimestamp));
+					if(previousTimestamp < currTimestamp) {
+						timestampInterval = (uint16_t)(currTimestamp - previousTimestamp);
+					}
+					else {
+						// Timer overflow
+						timestampInterval = (uint16_t)(currTimestamp + (~((uint32_t)0u) - previousTimestamp));
+					}
 				}
 
 				previousTimestamp = currTimestamp;

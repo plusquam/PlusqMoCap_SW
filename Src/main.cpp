@@ -84,6 +84,7 @@ static MPU9250_DMP 		IMUs[NUMBER_OF_SENSORS];
 volatile uint8_t 	isMpuMeasureReady = 0u;
 volatile uint8_t 	mpuDataToBeSend[75];
 volatile bool		runMeasurement = false;
+volatile bool		firstMeasurementLoop = true;
 volatile uint16_t	timestampInterval = 0u;
 /* USER CODE END PV */
 
@@ -99,7 +100,8 @@ static void MX_RTC_Init(void);
 #if PRINT_FULL_DATA
 static void printIMUData(uint8_t sensor_number);
 #endif
-static void readMpuDataCallback(void);
+static void InitialMpuProcedure(void);
+static void ReadMpuDataCallback(void);
 static void SetupMPUSensors(void);
 static void MeasurementLoop(void);
 /* USER CODE END PFP */
@@ -147,32 +149,17 @@ int main(void)
   MX_RF_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
-  SCH_RegTask( CFG_TASK_MPU9250_INT_ID, readMpuDataCallback );
+  SCH_RegTask( CFG_TASK_MPU9250_INT_ID, ReadMpuDataCallback );
   /* USER CODE END 2 */
   APPE_Init();
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-	///////////////// SPI FOR MPU9250 SET ///////////////////////
-	set_spi_handler(&hspi1);
-
-	///////////////// SENSOR CHECK ///////////////////////
-	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-	{
-	  set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-	  if(!test_whoAmI())
-		  while(1)
-		  {
-			  // Sensor check fail
-			  printf("Sensor check fail! Try again.\n");
-			  delay_ms(1000);
-		  }
-	}
-	printf("Sensors check passed.\n");
+///////////////// INIT PROCEDURE FOR MPU ///////////////////////
+  InitialMpuProcedure();
 
 ////////////////// LOOP START ///////////////////////////
-
   while (1)
   {
 	  MeasurementLoop();
@@ -688,6 +675,8 @@ void HAL_Delay(uint32_t Delay)
 
 void MeasurementLoop(void)
 {
+	firstMeasurementLoop = true;
+
 	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 	{
 		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
@@ -719,9 +708,11 @@ void MeasurementLoop(void)
 	printf("Fifo reset done.\n");
 	#endif
 
-	////////////////// SET MPU9250 INTERRUPT /////////////////////////
+	////////////////// ENABLE MPU9250 INTERRUPT /////////////////////////
 	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
+	mpu_set_slave4_interrupt();
 	IMUs[0].enableInterrupt(1);
+
 	uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
 	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
 	isMpuMeasureReady = 1u;
@@ -732,6 +723,15 @@ void MeasurementLoop(void)
 	{
 		SCH_Run(SCH_DEFAULT);
 	}
+
+	primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
+	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
+	isMpuMeasureReady = 0u;
+	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
+
+	////////////////// DISABLE MPU9250 INTERRUPT /////////////////////////
+	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
+	IMUs[0].enableInterrupt(0);
 
 	printf("Measurement stopped.\n\n");
 }
@@ -748,7 +748,7 @@ static void fillMissingData(void)
 }
 #endif
 
-void readMpuDataCallback(void)
+void ReadMpuDataCallback(void)
 {
 	uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
 	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
@@ -767,7 +767,7 @@ void readMpuDataCallback(void)
 #endif
 
 		// Wait until magnetometer data is ready
-		delay_ms(1);
+//		delay_ms(1);
 
 		for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 		{
@@ -798,7 +798,7 @@ void readMpuDataCallback(void)
 //			if(IMUs[i].update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS) != INV_SUCCESS)
 			if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3) != INV_SUCCESS) {
 				HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-//				printf("IMU nr %d data read error!\n", i);
+				printf("IMU nr %d data read error!\n", i);
 			}
 #endif
 		}
@@ -815,9 +815,7 @@ void readMpuDataCallback(void)
 		if(numOfIters >= numOfItersToPrint) {
 			for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 			{
-
 				printIMUData(i);
-
 			}
 			numOfIters = 0u;
 			printf("\n");
@@ -830,6 +828,27 @@ void readMpuDataCallback(void)
 	}
 
 	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
+}
+
+void InitialMpuProcedure(void)
+{
+	///////////////// SPI FOR MPU9250 SET ///////////////////////
+	set_spi_handler(&hspi1);
+
+	///////////////// SENSOR CHECK ///////////////////////
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		if(!test_whoAmI())
+		while(1)
+		{
+			// Sensor check fail
+			printf("Sensor check fail! Try again.\n");
+			delay_ms(1000);
+		}
+	}
+
+	printf("Sensors check passed.\n");
 }
 
 /* USER CODE END 4 */

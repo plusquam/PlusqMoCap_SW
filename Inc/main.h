@@ -105,6 +105,7 @@ extern UART_HandleTypeDef 	huart1;
 extern volatile uint8_t 	isMpuMeasureReady;
 extern volatile uint8_t 	mpuDataToBeSend[75];
 extern volatile bool		runMeasurement;
+extern volatile bool		firstMeasurementLoop;
 extern volatile uint16_t	timestampInterval;
 /* USER CODE END Private defines */
 
