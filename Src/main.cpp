@@ -796,13 +796,13 @@ void MeasurementLoop(void)
 	{
 		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
 		mpu_set_fsync_configuration();
+		mpu_set_slave4_interrupt();
 	}
 	// Enable PWM signal for MPU triggering
 	MX_TIM1_Init();
 
 	////////////////// ENABLE MPU9250 INTERRUPT /////////////////////////
 	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
-	mpu_set_slave4_interrupt();
 	IMUs[0].enableInterrupt(1);
 
 	uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
@@ -828,6 +828,8 @@ void MeasurementLoop(void)
 	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
 	IMUs[0].enableInterrupt(0);
 
+	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+
 	printf("Measurement stopped.\n\n");
 }
 
@@ -852,17 +854,17 @@ void ReadMpuDataCallback(void)
 		// Get timestamp
 		mpuDataToBeSend[1] = (uint8_t)(timestampInterval >> 8);
 		mpuDataToBeSend[2] = (uint8_t)timestampInterval;
+		IMUs[0].time = timestampInterval;
 
 		isMpuMeasureReady = 0u;
 		__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
 #if PRINT_FULL_DATA
 		static uint8_t numOfIters = 0u;
-		static constexpr uint8_t numOfItersToPrint = MPU_SAMPLE_RATE; // value set for 1Hz printf refresh rate
+		static constexpr uint8_t numOfItersToPrint = MPU_SAMPLE_RATE/3; // value set for 1Hz printf refresh rate
 #endif
 
-		// Wait until magnetometer data is ready
-//		delay_ms(1);
+		uint8_t error_result = 0u;
 
 		for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 		{
@@ -888,19 +890,37 @@ void ReadMpuDataCallback(void)
 				printf("DMP update fifo read error!\n");
 			}
 #else
+			if(i != 0) {
+				uint8_t timeout = 6;
+				while(!IMUs[i].dataReady() && timeout > 0)
+				{
+					// Wait until data is ready
+					delay_ms(1);
+					--timeout;
+				}
+			}
 
 		    // Call update() to update the imu objects sensor data.
-//			if(IMUs[i].update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS) != INV_SUCCESS)
 			if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3) != INV_SUCCESS) {
-				HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
 				printf("IMU nr %d data read error!\n", i);
+				error_result = 1;
 			}
+
 #endif
 		}
 
 #if(NUMBER_OF_SENSORS < 4)
 		fillMissingData();
 #endif
+		if(!error_result) {
+			mpuDataToBeSend[0] = 'S';
+			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+		}
+		else {
+			mpuDataToBeSend[0] = 'E';
+			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+		}
+
 		// Send measurements
 		SCH_SetTask(1<<CFG_TASK_MPU_DATA_READY_ID, CFG_SCH_PRIO_1);
 
