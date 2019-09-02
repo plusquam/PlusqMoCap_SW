@@ -135,6 +135,7 @@ int mpu_register_tap_cb(void (*func)(unsigned char, unsigned char));
 void getMagSensAdj(short *mag_sens_adj_x, short *mag_sens_adj_y, short *mag_sens_adj_z);
 int mpu_reset(void);
 int mpu_set_slave4_interrupt(void);
+int mpu_set_fsync_configuration(void);
 
 #endif  /* #ifndef _INV_MPU_H_ */
 

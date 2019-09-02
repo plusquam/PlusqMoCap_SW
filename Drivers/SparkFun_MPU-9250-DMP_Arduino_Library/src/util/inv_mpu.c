@@ -3292,16 +3292,19 @@ int mpu_set_slave4_interrupt()
 
 	// Setting SLV4_DONE_INT_EN bit
 	if (i2c_read(st.hw->addr, MPU9250_I2C_SLV4_CTRL, 1, &data))
-	        return -1;
+		return -1;
 
 	data |= (1 << 6);
 
 	if (i2c_write(st.hw->addr, MPU9250_I2C_SLV4_CTRL, 1, &data))
-	        return -1;
+		return -1;
 
 	// Setting WAIT_FOR_ES bit
     if (i2c_read(st.hw->addr, MPU9250_I2C_MST_CTRL, 1, &data))
+    {
         return -1;
+
+    }
 
 	data |= (1 << 6);
 
@@ -3309,6 +3312,31 @@ int mpu_set_slave4_interrupt()
 	        return -1;
 
     return 0;
+}
+
+int mpu_set_fsync_configuration()
+{
+	unsigned char data;
+
+	// Setting EXT_SYNC_SET bits for all data frame sync
+	if (i2c_read(st.hw->addr, MPU9250_CONFIG, 1, &data))
+		return -1;
+
+	data |= (0b111 << 3);
+
+	if (i2c_write(st.hw->addr, MPU9250_CONFIG, 1, &data))
+		return -1;
+
+	// Setting FSYNC_INT_MODE_EN bit
+	if (i2c_read(st.hw->addr, MPU9250_INT_PIN_CFG, 1, &data))
+		return -1;
+
+	data |= (1 << 2);
+
+	if (i2c_write(st.hw->addr, MPU9250_INT_PIN_CFG, 1, &data))
+		return -1;
+
+	return 0;
 }
 /**
  *  @}
