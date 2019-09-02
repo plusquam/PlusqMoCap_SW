@@ -243,14 +243,14 @@ inv_error_t MPU9250_DMP::resetFifo(void)
 
 unsigned short MPU9250_DMP::fifoAvailable(void)
 {
-	unsigned char fifoH, fifoL;
+	unsigned char data[2];
+	unsigned short fifo_count;
+
+    if (mpu_read_multi_reg(MPU9250_FIFO_COUNTH, data, 2))
+        return 0;
+    fifo_count = (data[0] << 8) | data[1];
 	
-	if (mpu_read_reg(MPU9250_FIFO_COUNTH, &fifoH) != INV_SUCCESS)
-		return 0;
-	if (mpu_read_reg(MPU9250_FIFO_COUNTL, &fifoL) != INV_SUCCESS)
-		return 0;
-	
-	return (fifoH << 8 ) | fifoL;
+	return fifo_count;
 }
 
 inv_error_t MPU9250_DMP::updateFifo(void)
@@ -733,77 +733,161 @@ bool MPU9250_DMP::magDataReady()
 	return isReady;
 }
 
-inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offset)
+inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offset, unsigned char fifoEnabled)
 {
-	constexpr unsigned char DATA_SIZE = (sizeof(ax) * 3) + sizeof(short) + (sizeof(gx) * 3) + 8;
-	// Data frame: 3acc + temp + 3gyro + 8B mag data
-	unsigned char data[DATA_SIZE];
+	if(!fifoEnabled)
+	{
+		// Data is stored in sensor registers //
 
-	if(mpu_read_multi_reg(MPU9250_ACCEL_XOUT_H, data, DATA_SIZE))
-		return INV_ERROR;
+		constexpr unsigned char DATA_SIZE = (sizeof(ax) * 3) + sizeof(short) + (sizeof(gx) * 3) + 8;
+		// Data frame: 3acc + temp + 3gyro + 8B mag data
+		unsigned char data[DATA_SIZE];
 
-	if(buffer == NULL) {
-		// Accel
-		ax = (data[0] << 8) | data[1];
-		ay = (data[2] << 8) | data[3];
-		az = (data[4] << 8) | data[5];
+		if(mpu_read_multi_reg(MPU9250_ACCEL_XOUT_H, data, DATA_SIZE))
+			return INV_ERROR;
 
-		// Temperature // don't care now
-	//    temperature = TODO
+		if(buffer == NULL) {
+		// Buffer not given -> data stored in class members
+			// Accel
+			ax = (data[0] << 8) | data[1];
+			ay = (data[2] << 8) | data[3];
+			az = (data[4] << 8) | data[5];
 
-		//Gyro
-		gx = (data[8] << 8) | data[9];
-		gy = (data[10] << 8) | data[11];
-		gz = (data[12] << 8) | data[13];
+			// Temperature // don't care now
+		//    temperature = TODO
 
-		//Mag
-		if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
-			return -2;
-	//    if (data[21] & AKM_OVERFLOW)
-	//        return -3;
+			//Gyro
+			gx = (data[8] << 8) | data[9];
+			gy = (data[10] << 8) | data[11];
+			gz = (data[12] << 8) | data[13];
 
-		short mag_sens_adj[3];
-		getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+			//Mag
+			if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
+				return -2;
+		//    if (data[21] & AKM_OVERFLOW)
+		//        return -3;
 
-		mx = (data[16] << 8) | data[15];
-		my = (data[18] << 8) | data[17];
-		mz = (data[20] << 8) | data[19];
+			short mag_sens_adj[3];
+			getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
 
-		mx = ((long)mx * mag_sens_adj[0]) >> 8;
-		my = ((long)my * mag_sens_adj[1]) >> 8;
-		mz = ((long)mz * mag_sens_adj[2]) >> 8;
+			mx = (data[16] << 8) | data[15];
+			my = (data[18] << 8) | data[17];
+			mz = (data[20] << 8) | data[19];
+
+			mx = ((long)mx * mag_sens_adj[0]) >> 8;
+			my = ((long)my * mag_sens_adj[1]) >> 8;
+			mz = ((long)mz * mag_sens_adj[2]) >> 8;
+		}
+		else
+		{
+			// Buffer given -> data stored in input buffer
+			if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
+				return -2;
+
+			unsigned char *buffer_with_offset = buffer + offset;
+
+			// Acc
+			memcpy(buffer_with_offset, data, sizeof(ax) * 3);
+
+			//Gyro
+			memcpy(buffer_with_offset + 6, data + 8, sizeof(gx) * 3);
+
+			// Mag
+			short temp_mx = (data[16] << 8) | data[15];
+			short temp_my = (data[18] << 8) | data[17];
+			short temp_mz = (data[20] << 8) | data[19];
+
+			short mag_sens_adj[3];
+			getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+
+			temp_mx = ((long)temp_mx * mag_sens_adj[0]) >> 8;
+			temp_my = ((long)temp_my * mag_sens_adj[1]) >> 8;
+			temp_mz = ((long)temp_mz * mag_sens_adj[2]) >> 8;
+
+			buffer_with_offset[12] = (unsigned char)(temp_mx >> 8);
+			buffer_with_offset[13] = (unsigned char)temp_mx;
+			buffer_with_offset[14] = (unsigned char)(temp_mx >> 8);
+			buffer_with_offset[15] = (unsigned char)temp_mx;
+			buffer_with_offset[16] = (unsigned char)(temp_mx >> 8);
+			buffer_with_offset[17] = (unsigned char)temp_mx;
+		}
 	}
 	else
 	{
-		if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
-			return -2;
+		// Data is stored in FIFO //
 
-		unsigned char *buffer_with_offset = buffer + offset;
+		constexpr unsigned char DATA_SIZE = (sizeof(ax) * 3) + (sizeof(gx) * 3) + 8;
+		// Data frame: 3acc + 3gyro + 8B mag data
+		unsigned char data[DATA_SIZE];
 
-		// Acc
-		memcpy(buffer_with_offset, data, sizeof(ax) * 3);
+	    if (mpu_read_multi_reg(MPU9250_FIFO_R_W, data, DATA_SIZE))
+	        return -1;
 
-		//Gyro
-		memcpy(buffer_with_offset + 6, data + 8, sizeof(gx) * 3);
+	    if(buffer == NULL) {
+		// Buffer not given -> data stored in class members
+			// Accel
+			ax = (data[0] << 8) | data[1];
+			ay = (data[2] << 8) | data[3];
+			az = (data[4] << 8) | data[5];
 
-		// Mag
-		short temp_mx = (data[16] << 8) | data[15];
-		short temp_my = (data[18] << 8) | data[17];
-		short temp_mz = (data[20] << 8) | data[19];
+			// Temperature // don't care now
+		//    temperature = TODO
 
-		short mag_sens_adj[3];
-		getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+			//Gyro
+			gx = (data[6] << 8) | data[7];
+			gy = (data[8] << 8) | data[9];
+			gz = (data[10] << 8) | data[11];
 
-		temp_mx = ((long)temp_mx * mag_sens_adj[0]) >> 8;
-		temp_my = ((long)temp_my * mag_sens_adj[1]) >> 8;
-		temp_mz = ((long)temp_mz * mag_sens_adj[2]) >> 8;
+			//Mag
+			if (!(data[12] & AKM_DATA_READY)) // || (data[12] & AKM_DATA_OVERRUN))
+				return -2;
+		//    if (data[19] & AKM_OVERFLOW)
+		//        return -3;
 
-		buffer_with_offset[12] = (unsigned char)(temp_mx >> 8);
-		buffer_with_offset[13] = (unsigned char)temp_mx;
-		buffer_with_offset[14] = (unsigned char)(temp_mx >> 8);
-		buffer_with_offset[15] = (unsigned char)temp_mx;
-		buffer_with_offset[16] = (unsigned char)(temp_mx >> 8);
-		buffer_with_offset[17] = (unsigned char)temp_mx;
+			short mag_sens_adj[3];
+			getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+
+			mx = (data[14] << 8) | data[13];
+			my = (data[16] << 8) | data[15];
+			mz = (data[18] << 8) | data[17];
+
+			mx = ((long)mx * mag_sens_adj[0]) >> 8;
+			my = ((long)my * mag_sens_adj[1]) >> 8;
+			mz = ((long)mz * mag_sens_adj[2]) >> 8;
+		}
+		else
+		{
+			// Buffer given -> data stored in input buffer
+			if (!(data[12] & AKM_DATA_READY))
+				return -2;
+
+			unsigned char *buffer_with_offset = buffer + offset;
+
+			// Acc
+			memcpy(buffer_with_offset, data, sizeof(ax) * 3);
+
+			//Gyro
+			memcpy(buffer_with_offset + 6, data + 6, sizeof(gx) * 3);
+
+			// Mag
+			short temp_mx = (data[14] << 8) | data[13];
+			short temp_my = (data[16] << 8) | data[15];
+			short temp_mz = (data[18] << 8) | data[17];
+
+			short mag_sens_adj[3];
+			getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+
+			temp_mx = ((long)temp_mx * mag_sens_adj[0]) >> 8;
+			temp_my = ((long)temp_my * mag_sens_adj[1]) >> 8;
+			temp_mz = ((long)temp_mz * mag_sens_adj[2]) >> 8;
+
+			buffer_with_offset[12] = (unsigned char)(temp_mx >> 8);
+			buffer_with_offset[13] = (unsigned char)temp_mx;
+			buffer_with_offset[14] = (unsigned char)(temp_mx >> 8);
+			buffer_with_offset[15] = (unsigned char)temp_mx;
+			buffer_with_offset[16] = (unsigned char)(temp_mx >> 8);
+			buffer_with_offset[17] = (unsigned char)temp_mx;
+		}
 	}
 
 	return INV_SUCCESS;

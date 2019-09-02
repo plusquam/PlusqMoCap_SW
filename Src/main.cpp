@@ -50,7 +50,7 @@ typedef struct
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define NUMBER_OF_SENSORS	3
-#define PRINT_FULL_DATA		0
+#define PRINT_FULL_DATA		1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -472,6 +472,8 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void SetupMPUSensors(void)
 {
+	unsigned char chosenSensors = INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS;
+
 	////////////////// SETUP /////////////////////////////
 	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 	{
@@ -523,7 +525,7 @@ void SetupMPUSensors(void)
 #else
 		// Enable all sensors, and set sample rates to 4Hz.
 		// (Slow so we can see the interrupt work.)
-		IMUs[i].setSensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
+		IMUs[i].setSensors(chosenSensors);
 		IMUs[i].setSampleRate(MPU_SAMPLE_RATE); // Set accel/gyro sample rate to 100 Hz
 		IMUs[i].setCompassSampleRate(MPU_SAMPLE_RATE); // Set mag rate to 100 Hz
 
@@ -547,17 +549,28 @@ void SetupMPUSensors(void)
 			IMUs[i].setIntLatched(INT_50US_PULSE);
 		}
 #endif
+
+		mpu_set_slave4_interrupt();
+
+	////////////////// Configure FIFO /////////////////////////////
+		if ( IMUs[i].configureFifo(chosenSensors) != INV_SUCCESS)
+		while (1)
+		{
+			printf("Unable to configure FIFO!\n");
+			printf("Check connections, and try again.\n\n");
+			HAL_Delay(1000);
+		}
 	}
 
 	////////////////// Disable interrupts /////////////////////////////
-	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
-	if ( IMUs[0].enableInterrupt(0) != INV_SUCCESS)
-	while (1)
-	{
-		printf("Unable to disable interrupt.\n");
-		printf("Check connections, and try again.\n");
-		HAL_Delay(1000);
-	}
+//	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
+//	if ( IMUs[0].enableInterrupt(0) != INV_SUCCESS)
+//	while (1)
+//	{
+//		printf("Unable to disable interrupt!\n");
+//		printf("Check connections, and try again.\n\n");
+//		HAL_Delay(1000);
+//	}
 
 	printf("Setup done.\n");
 }
@@ -677,13 +690,6 @@ void MeasurementLoop(void)
 {
 	firstMeasurementLoop = true;
 
-	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-	{
-		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-		IMUs[i].resetDevice();
-	}
-	printf("Sensors reset.\n");
-
 	///// FILL MOCK DATA ///////
 	mpuDataToBeSend[0] = 'S';
 
@@ -698,19 +704,32 @@ void MeasurementLoop(void)
 	////////////////// SENSORS SETUP //////////////////////////
 	SetupMPUSensors();
 
-	#if MPU_DMP_DATA_ENABLE
 	////////////////// RESET FIFO /////////////////////////////
+#if MPU_DMP_DATA_ENABLE
 	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 	{
-	set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-	IMUs[i].resetFifo();
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		IMUs[i].resetFifo();
 	}
+#else
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		mpu_set_fast_reset_fifo();
+	}
+	delay_ms(50);
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		mpu_fast_set_fifo();
+	}
+#endif
 	printf("Fifo reset done.\n");
-	#endif
+
+	delay_ms(50);
 
 	////////////////// ENABLE MPU9250 INTERRUPT /////////////////////////
 	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
-	mpu_set_slave4_interrupt();
 	IMUs[0].enableInterrupt(1);
 
 	uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
@@ -732,6 +751,14 @@ void MeasurementLoop(void)
 	////////////////// DISABLE MPU9250 INTERRUPT /////////////////////////
 	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
 	IMUs[0].enableInterrupt(0);
+
+	////////////////// RESET MPU9250  /////////////////////////
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		IMUs[i].resetDevice();
+	}
+	printf("Sensors reset.\n");
 
 	printf("Measurement stopped.\n\n");
 }
@@ -763,7 +790,7 @@ void ReadMpuDataCallback(void)
 
 #if PRINT_FULL_DATA
 		static uint8_t numOfIters = 0u;
-		static constexpr uint8_t numOfItersToPrint = MPU_SAMPLE_RATE; // value set for 1Hz printf refresh rate
+		static constexpr uint8_t numOfItersToPrint = MPU_SAMPLE_RATE/3; // value set for 1Hz printf refresh rate
 #endif
 
 		// Wait until magnetometer data is ready
@@ -773,7 +800,6 @@ void ReadMpuDataCallback(void)
 		{
 			set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
 
-#if MPU_DMP_DATA_ENABLE
 			// Check for new data in the FIFO
 			if (i == 0 )
 				while(!IMUs[i].fifoAvailable())
@@ -781,6 +807,7 @@ void ReadMpuDataCallback(void)
 					delay_ms(1);
 				}
 
+#if MPU_DMP_DATA_ENABLE
 			// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
 			if ( IMUs[i].dmpUpdateFifo() == INV_SUCCESS)
 			{
@@ -796,7 +823,9 @@ void ReadMpuDataCallback(void)
 
 		    // Call update() to update the imu objects sensor data.
 //			if(IMUs[i].update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS) != INV_SUCCESS)
-			if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3) != INV_SUCCESS) {
+//			if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3, true) != INV_SUCCESS) {
+			if(IMUs[i].allDataUpdate(NULL, 0, true) != INV_SUCCESS) {
+
 				HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
 				printf("IMU nr %d data read error!\n", i);
 			}

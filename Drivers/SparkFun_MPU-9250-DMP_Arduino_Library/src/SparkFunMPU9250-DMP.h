@@ -378,7 +378,7 @@ public:
 	// Output: INV_SUCCESS (0) on success, otherwise error
 	// Note: after a successful update the public sensor variables
 	// (e.g. ax, ay, az, gx, gy, gz) will be updated with new data
-	inv_error_t allDataUpdate(unsigned char *buffer, unsigned char offset);
+	inv_error_t allDataUpdate(unsigned char *buffer, unsigned char offset, unsigned char fifoEnabled);
 
 	inv_error_t resetDevice(void);
 

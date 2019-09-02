@@ -637,7 +637,7 @@ int mpu_read_reg(unsigned char reg, unsigned char *data)
  */
 int mpu_read_multi_reg(unsigned char reg, unsigned char *data, unsigned char length)
 {
-    if (reg == st.reg->fifo_r_w || reg == st.reg->mem_r_w)
+    if (reg == st.reg->mem_r_w)
         return -1;
     if (reg >= st.hw->num_reg)
         return -1;
@@ -1512,7 +1512,7 @@ int mpu_configure_fifo(unsigned char sensors)
     int result = 0;
 
     /* Compass data isn't going into the FIFO. Stop trying. */
-    sensors &= ~INV_XYZ_COMPASS;
+//    sensors &= ~INV_XYZ_COMPASS;
 
     if (st.chip_cfg.dmp_on)
         return 0;
@@ -3292,22 +3292,74 @@ int mpu_set_slave4_interrupt()
 
 	// Setting SLV4_DONE_INT_EN bit
 	if (i2c_read(st.hw->addr, MPU9250_I2C_SLV4_CTRL, 1, &data))
-	        return -1;
+	    return -1;
 
 	data |= (1 << 6);
 
 	if (i2c_write(st.hw->addr, MPU9250_I2C_SLV4_CTRL, 1, &data))
-	        return -1;
+	    return -1;
 
 	// Setting WAIT_FOR_ES bit
-    if (i2c_read(st.hw->addr, MPU9250_I2C_MST_CTRL, 1, &data))
+    if (i2c_read(st.hw->addr, MPU9250_I2C_MST_CTRL, 1, &data)) {
         return -1;
+    }
 
-	data |= (1 << 6);
+	data |= (1 << 6) | 13u; // 400kHz master clock
 
 	if (i2c_write(st.hw->addr, MPU9250_I2C_MST_CTRL, 1, &data))
-	        return -1;
+	    return -1;
 
+    return 0;
+}
+
+int mpu_set_fast_reset_fifo(void)
+{
+    unsigned char data;
+
+    if (!(st.chip_cfg.sensors))
+        return -1;
+
+    data = 0;
+    if (i2c_write(st.hw->addr, st.reg->int_enable, 1, &data))
+        return -1;
+    if (i2c_write(st.hw->addr, st.reg->fifo_en, 1, &data))
+        return -1;
+    if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &data))
+        return -1;
+
+    if (st.chip_cfg.dmp_on) {
+            return -2;
+    } else {
+        data = BIT_FIFO_RST;
+        if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &data))
+            return -1;
+        if (st.chip_cfg.bypass_mode || !(st.chip_cfg.sensors & INV_XYZ_COMPASS))
+            data = BIT_FIFO_EN;
+        else
+            data = BIT_FIFO_EN | BIT_AUX_IF_EN;
+        if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &data))
+            return -1;
+    }
+
+    return 0;
+}
+
+int mpu_fast_set_fifo(void)
+{
+    unsigned char data;
+
+    if (st.chip_cfg.dmp_on) {
+            return -2;
+    } else {
+        if (st.chip_cfg.int_enable)
+            data = BIT_DATA_RDY_EN;
+        else
+            data = 0;
+        if (i2c_write(st.hw->addr, st.reg->int_enable, 1, &data))
+            return -1;
+        if (i2c_write(st.hw->addr, st.reg->fifo_en, 1, &st.chip_cfg.fifo_enable))
+            return -1;
+    }
     return 0;
 }
 /**
