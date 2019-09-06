@@ -26,6 +26,7 @@
 /* USER CODE BEGIN Includes */
 #include <SparkFunMPU9250-DMP.h>
 extern "C" {
+#include "MPU9250_RegisterMap.h"
 #include "stm32_mpu9250_spi.h"
 #include "stm32_utils.h"
 #include "app_conf.h"
@@ -49,8 +50,8 @@ typedef struct
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define NUMBER_OF_SENSORS	3
-#define PRINT_FULL_DATA		0
+#define NUMBER_OF_SENSORS		3
+#define PRINT_FULL_DATA			0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -64,7 +65,9 @@ RTC_HandleTypeDef hrtc;
 
 SPI_HandleTypeDef hspi1;
 
+#if ENABLE_SENSORS_SYNCH
 TIM_HandleTypeDef htim1;
+#endif
 
 UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_tx;
@@ -82,7 +85,7 @@ SpiSlaveHandler_t spiSlavesArray[] =
 #define NUMBER_OF_SENSORS (sizeof(spiSlavesArray)/sizeof(SpiSlaveHandler_t))
 #endif
 
-static MPU9250_DMP 		IMUs[NUMBER_OF_SENSORS];
+static MPU9250_DMP 	IMUs[NUMBER_OF_SENSORS];
 volatile uint8_t 	isMpuMeasureReady = 0u;
 volatile uint8_t 	mpuDataToBeSend[75];
 volatile bool		runMeasurement = false;
@@ -98,7 +101,9 @@ static void MX_USART1_UART_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_RF_Init(void);
 static void MX_RTC_Init(void);
+#if ENABLE_SENSORS_SYNCH
 static void MX_TIM1_Init(void);
+#endif
 /* USER CODE BEGIN PFP */
 #if PRINT_FULL_DATA
 static void printIMUData(uint8_t sensor_number);
@@ -321,7 +326,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -338,6 +343,7 @@ static void MX_SPI1_Init(void)
 
 }
 
+#if ENABLE_SENSORS_SYNCH
 /**
   * @brief TIM1 Initialization Function
   * @param None
@@ -417,6 +423,7 @@ static void MX_TIM1_Init(void)
   HAL_TIM_MspPostInit(&htim1);
 
 }
+#endif
 
 /**
   * @brief USART1 Initialization Function
@@ -513,7 +520,7 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pin = SPI1_CS_0_Pin|SPI1_CS_1_Pin|SPI1_CS_2_Pin|SPI1_CS_3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : B1_Pin */
@@ -719,13 +726,10 @@ void printIMUData(uint8_t sensor_number)
 }
 #endif
 
-extern "C" {
-#include "stm32_mpu9250_spi.h"
-}
 bool test_whoAmI()
 {
 	uint8_t readData[5] = {0};
-	if(spi_read(0u, 0x75u, 4u, readData)) {
+	if(spi_read(0u, MPU9250_WHO_AM_I, 4u, readData)) {
 		printf("Check error\n");
 		return false;
 	}
@@ -755,6 +759,8 @@ void HAL_Delay(uint32_t Delay)
 	  	SCH_Run(SCH_DEFAULT);
   }
 }
+
+
 
 void MeasurementLoop(void)
 {
@@ -795,11 +801,16 @@ void MeasurementLoop(void)
 	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 	{
 		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+#if ENABLE_SENSORS_SYNCH
 		mpu_set_fsync_configuration();
 		mpu_set_slave4_interrupt();
+#endif
 	}
+
+#if ENABLE_SENSORS_SYNCH
 	// Enable PWM signal for MPU triggering
 	MX_TIM1_Init();
+#endif
 
 	////////////////// ENABLE MPU9250 INTERRUPT /////////////////////////
 	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
@@ -816,8 +827,10 @@ void MeasurementLoop(void)
 		SCH_Run(SCH_DEFAULT);
 	}
 
+#if ENABLE_SENSORS_SYNCH
 	// Disable PWM signal for MPU triggering
 	HAL_TIM_Base_MspDeInit(&htim1);
+#endif
 
 	primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
 	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
@@ -833,6 +846,8 @@ void MeasurementLoop(void)
 	printf("Measurement stopped.\n\n");
 }
 
+
+
 #if(NUMBER_OF_SENSORS < 4)
 static void fillMissingData(void)
 {
@@ -844,6 +859,8 @@ static void fillMissingData(void)
 	}
 }
 #endif
+
+
 
 void ReadMpuDataCallback(void)
 {
@@ -945,6 +962,8 @@ void ReadMpuDataCallback(void)
 	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 }
 
+
+
 void InitialMpuProcedure(void)
 {
 	///////////////// SPI FOR MPU9250 SET ///////////////////////
@@ -954,15 +973,16 @@ void InitialMpuProcedure(void)
 	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 	{
 		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-		if(!test_whoAmI())
-		while(1)
+		while(!test_whoAmI())
 		{
+			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 			// Sensor check fail
-			printf("Sensor check fail! Try again.\n");
-			delay_ms(1000);
+			printf("Sensor nr %d check fail! Try again.\n", i);
+			delay_ms(500);
 		}
 	}
 
+	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 	printf("Sensors check passed.\n");
 }
 

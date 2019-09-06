@@ -38,7 +38,7 @@ static inline uint8_t spi_write_register(uint8_t reg_addr, uint8_t * data, uint8
 	reg_addr &= 0x7F; //  MSB = 0 for writing operation
 
 	HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_RESET);
-	delay_us(1);
+	delay_us(3);
 
 	returnVal |= HAL_SPI_Transmit(spi_handler, &reg_addr, 1u, 2u);
 	if(!returnVal)
@@ -58,12 +58,14 @@ static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_
 {
 	uint8_t returnVal = 0u;
 
+#if SPI_SPEEDUP_FOR_SENSOR_DATA
 	uint32_t CR1_old = spi_handler->Instance->CR1;
 	// Set higher SPI clock freq. for data registers
 	if((reg_addr >= MPU9250_ACCEL_XOUT_H) && ((reg_addr + length - 1) <= MPU9250_EXT_SENS_DATA_23)) {
 		__IO uint32_t CR1_new = (CR1_old & ~(0x00000007 << 3u)) | SPI_BAUDRATEPRESCALER_8;
 		WRITE_REG(spi_handler->Instance->CR1, CR1_new);
 	}
+#endif
 
 	if(length < 30)
 	{
@@ -71,7 +73,7 @@ static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_
 
 		HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_RESET);
 		uint8_t dummy_buffer[30] = {0};
-		delay_us(1);
+		delay_us(3);
 
 		returnVal |= HAL_SPI_Transmit(spi_handler, &reg_addr, 1u, 2u);
 		if(!returnVal)
@@ -87,10 +89,12 @@ static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_
 		returnVal = 1u;
 	}
 
+#if SPI_SPEEDUP_FOR_SENSOR_DATA
 	// Restore SPI clock freq. for data registers
 	if((reg_addr >= MPU9250_ACCEL_XOUT_H) && ((reg_addr + length - 1) <= MPU9250_EXT_SENS_DATA_23)) {
 		WRITE_REG(spi_handler->Instance->CR1, CR1_old);
 	}
+#endif
 
 	if(returnVal == 3u)
 		printf("SPI read timeout!\n");

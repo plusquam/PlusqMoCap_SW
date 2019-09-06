@@ -54,6 +54,9 @@ extern "C" {
 #else
 #define MPU_SAMPLE_RATE 100 //[Hz]
 #endif
+
+#define ENABLE_SENSORS_SYNCH	0
+
 /* USER CODE END EM */
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);

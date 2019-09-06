@@ -14,6 +14,8 @@
 #define SPI 1
 
 #ifdef SPI
+#define SPI_SPEEDUP_FOR_SENSOR_DATA	0
+
 void set_spi_handler(SPI_HandleTypeDef *handler);
 extern void set_CS_portpin(GPIO_TypeDef *port, uint16_t pin);
 extern void get_CS_portpin(GPIO_TypeDef *port, uint16_t *pin);
