@@ -54,10 +54,6 @@ inv_error_t MPU9250_DMP::begin(void)
 	if (result)
 		return result;
 	
-//	mpu_set_bypass(1); // Place all slaves (including compass) on primary bus
-	
-	setSensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
-	
 	_gSense = getGyroSens();
 	_aSense = getAccelSens();
 	
@@ -282,7 +278,10 @@ inv_error_t MPU9250_DMP::updateFifo(void)
 
 inv_error_t MPU9250_DMP::setSensors(unsigned char sensors)
 {
-	return mpu_set_sensors(sensors);
+	inv_error_t result = mpu_set_sensors(sensors);
+	if(!result)
+		this->chosen_sensors = sensors;
+	return result;
 }
 
 bool MPU9250_DMP::dataReady()
@@ -739,8 +738,14 @@ inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offs
 	// Data frame: 3acc + temp + 3gyro + 8B mag data
 	unsigned char data[DATA_SIZE];
 
-	if(mpu_read_multi_reg(MPU9250_ACCEL_XOUT_H, data, DATA_SIZE))
-		return INV_ERROR;
+	if(chosen_sensors & INV_XYZ_COMPASS) {
+		if(mpu_read_multi_reg(MPU9250_ACCEL_XOUT_H, data, DATA_SIZE))
+			return INV_ERROR;
+	}
+	else {
+		if(mpu_read_multi_reg(MPU9250_ACCEL_XOUT_H, data, 14))
+			return INV_ERROR;
+	}
 
 	if(buffer == NULL) {
 		// Accel
@@ -756,27 +761,31 @@ inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offs
 		gy = (data[10] << 8) | data[11];
 		gz = (data[12] << 8) | data[13];
 
-		//Mag
-		if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
-			return -2;
-	//    if (data[21] & AKM_OVERFLOW)
-	//        return -3;
+		if(chosen_sensors & INV_XYZ_COMPASS) {
+			//Mag
+			if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
+				return -2;
+		//    if (data[21] & AKM_OVERFLOW)
+		//        return -3;
 
-		short mag_sens_adj[3];
-		getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+			short mag_sens_adj[3];
+			getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
 
-		mx = (data[16] << 8) | data[15];
-		my = (data[18] << 8) | data[17];
-		mz = (data[20] << 8) | data[19];
+			mx = (data[16] << 8) | data[15];
+			my = (data[18] << 8) | data[17];
+			mz = (data[20] << 8) | data[19];
 
-		mx = ((long)mx * mag_sens_adj[0]) >> 8;
-		my = ((long)my * mag_sens_adj[1]) >> 8;
-		mz = ((long)mz * mag_sens_adj[2]) >> 8;
+			mx = ((long)mx * mag_sens_adj[0]) >> 8;
+			my = ((long)my * mag_sens_adj[1]) >> 8;
+			mz = ((long)mz * mag_sens_adj[2]) >> 8;
+		}
 	}
 	else
 	{
-		if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
-			return -2;
+		if(chosen_sensors & INV_XYZ_COMPASS) {
+			if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
+				return -2;
+		}
 
 		unsigned char *buffer_with_offset = buffer + offset;
 
@@ -786,24 +795,26 @@ inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offs
 		//Gyro
 		memcpy(buffer_with_offset + 6, data + 8, sizeof(gx) * 3);
 
-		// Mag
-		short temp_mx = (data[16] << 8) | data[15];
-		short temp_my = (data[18] << 8) | data[17];
-		short temp_mz = (data[20] << 8) | data[19];
+		if(chosen_sensors & INV_XYZ_COMPASS) {
+			// Mag
+			short temp_mx = (data[16] << 8) | data[15];
+			short temp_my = (data[18] << 8) | data[17];
+			short temp_mz = (data[20] << 8) | data[19];
 
-		short mag_sens_adj[3];
-		getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+			short mag_sens_adj[3];
+			getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
 
-		temp_mx = ((long)temp_mx * mag_sens_adj[0]) >> 8;
-		temp_my = ((long)temp_my * mag_sens_adj[1]) >> 8;
-		temp_mz = ((long)temp_mz * mag_sens_adj[2]) >> 8;
+			temp_mx = ((long)temp_mx * mag_sens_adj[0]) >> 8;
+			temp_my = ((long)temp_my * mag_sens_adj[1]) >> 8;
+			temp_mz = ((long)temp_mz * mag_sens_adj[2]) >> 8;
 
-		buffer_with_offset[12] = (unsigned char)(temp_mx >> 8);
-		buffer_with_offset[13] = (unsigned char)temp_mx;
-		buffer_with_offset[14] = (unsigned char)(temp_mx >> 8);
-		buffer_with_offset[15] = (unsigned char)temp_mx;
-		buffer_with_offset[16] = (unsigned char)(temp_mx >> 8);
-		buffer_with_offset[17] = (unsigned char)temp_mx;
+			buffer_with_offset[12] = (unsigned char)(temp_mx >> 8);
+			buffer_with_offset[13] = (unsigned char)temp_mx;
+			buffer_with_offset[14] = (unsigned char)(temp_mx >> 8);
+			buffer_with_offset[15] = (unsigned char)temp_mx;
+			buffer_with_offset[16] = (unsigned char)(temp_mx >> 8);
+			buffer_with_offset[17] = (unsigned char)temp_mx;
+		}
 	}
 
 	return INV_SUCCESS;

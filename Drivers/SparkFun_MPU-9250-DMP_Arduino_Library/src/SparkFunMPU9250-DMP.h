@@ -75,6 +75,7 @@ public:
 	unsigned long time;
 	float pitch, roll, yaw;
 	float heading;
+	unsigned char chosen_sensors;
 	
 	MPU9250_DMP();
 	

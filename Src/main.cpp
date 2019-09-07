@@ -24,13 +24,12 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <SparkFunMPU9250-DMP.h>
 extern "C" {
 #include "MPU9250_RegisterMap.h"
 #include "stm32_mpu9250_spi.h"
 #include "stm32_utils.h"
 #include "app_conf.h"
-//#include "utilities_common.h"
+#include "scheduler.h"
 }
 #include <string.h>
 
@@ -50,8 +49,6 @@ typedef struct
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define NUMBER_OF_SENSORS		3
-#define PRINT_FULL_DATA			0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -87,7 +84,10 @@ SpiSlaveHandler_t spiSlavesArray[] =
 
 static MPU9250_DMP 	IMUs[NUMBER_OF_SENSORS];
 volatile uint8_t 	isMpuMeasureReady = 0u;
+
 volatile uint8_t 	mpuDataToBeSend[75];
+volatile uint8_t	mpuDataLength = 0u;
+
 volatile bool		runMeasurement = false;
 volatile bool		firstMeasurementLoop = true;
 volatile uint16_t	timestampInterval = 0u;
@@ -112,14 +112,11 @@ static void InitialMpuProcedure(void);
 static void ReadMpuDataCallback(void);
 static void SetupMPUSensors(void);
 static void MeasurementLoop(void);
+bool test_whoAmI(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-bool test_whoAmI();
-#include "scheduler.h"
-
 /* USER CODE END 0 */
 
 /**
@@ -613,9 +610,12 @@ void SetupMPUSensors(void)
 #else
 		// Enable all sensors, and set sample rates to 4Hz.
 		// (Slow so we can see the interrupt work.)
-		IMUs[i].setSensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
+		IMUs[i].setSensors(MPU_SENSORS_SET);
 		IMUs[i].setSampleRate(MPU_SAMPLE_RATE); // Set accel/gyro sample rate to 100 Hz
+
+#if MPU_SENSORS_SET & INV_XYZ_COMPASS
 		IMUs[i].setCompassSampleRate(MPU_SAMPLE_RATE); // Set mag rate to 100 Hz
+#endif
 
 		if(i == 0)
 		{
@@ -848,18 +848,10 @@ void MeasurementLoop(void)
 
 
 
-#if(NUMBER_OF_SENSORS < 4)
-static void fillMissingData(void)
+static constexpr uint8_t calculateTimeout(void)
 {
-	const char string[] = "AAAAAAGGGGGGMMMMMM";
-	for(uint8_t i = NUMBER_OF_SENSORS; i < 4; ++i)
-	{
-		uint8_t offset = i * 18 + 3;
-		memcpy((void*)(mpuDataToBeSend + offset), string, 18);
-	}
+	return (uint8_t)(1000 / MPU_SAMPLE_RATE) / 3;
 }
-#endif
-
 
 
 void ReadMpuDataCallback(void)
@@ -907,8 +899,10 @@ void ReadMpuDataCallback(void)
 				printf("DMP update fifo read error!\n");
 			}
 #else
+
+#if MPU_SENSORS_SET & INV_XYZ_COMPASS
 			if(i != 0) {
-				uint8_t timeout = 6;
+				uint8_t timeout = (uint8_t)calculateTimeout();
 				while(!IMUs[i].dataReady() && timeout > 0)
 				{
 					// Wait until data is ready
@@ -917,24 +911,32 @@ void ReadMpuDataCallback(void)
 				}
 			}
 
-		    // Call update() to update the imu objects sensor data.
+			// Update of IMU sensor data
 			if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3) != INV_SUCCESS) {
 				printf("IMU nr %d data read error!\n", i);
 				error_result = 1;
 			}
-
+#else
+			if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 12 + 3) != INV_SUCCESS) {
+				printf("IMU nr %d data read error!\n", i);
+				error_result = 1;
+			}
+#endif
 #endif
 		}
 
-#if(NUMBER_OF_SENSORS < 4)
-		fillMissingData();
-#endif
 		if(!error_result) {
 			mpuDataToBeSend[0] = 'S';
+#if MPU_SENSORS_SET & INV_XYZ_COMPASS
+			mpuDataLength = NUMBER_OF_SENSORS * 18 + 3;
+#else
+			mpuDataLength = NUMBER_OF_SENSORS * 12 + 3;
+#endif
 			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 		}
 		else {
 			mpuDataToBeSend[0] = 'E';
+			mpuDataLength = 3u;
 			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 		}
 

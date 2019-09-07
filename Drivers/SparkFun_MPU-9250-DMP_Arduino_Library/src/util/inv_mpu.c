@@ -3273,9 +3273,11 @@ int mpu_reset()
 
 #ifdef AK89xx_SECONDARY
     /* Reset magnetometer device. */
-    data = 0x01;
-    if (i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL2, 1, &data))
-        return -1;
+    if(st.chip_cfg.sensors & INV_XYZ_COMPASS) {
+		data = 0x01;
+		if (i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL2, 1, &data))
+			return -1;
+    }
 #endif
 
     /* Reset device. */
@@ -3288,6 +3290,9 @@ int mpu_reset()
 
 int mpu_set_slave4_interrupt()
 {
+	if(!(st.chip_cfg.sensors & INV_XYZ_COMPASS))
+		return -2;
+
 	unsigned char data;
 
 	// Setting WAIT_FOR_ES bit
@@ -3317,14 +3322,16 @@ int mpu_set_fsync_configuration()
 	if (i2c_write(st.hw->addr, MPU9250_CONFIG, 1, &data))
 		return -1;
 
-	// Setting FSYNC_INT_MODE_EN bit
-	if (i2c_read(st.hw->addr, MPU9250_INT_PIN_CFG, 1, &data))
-		return -1;
+	if((st.chip_cfg.sensors & INV_XYZ_COMPASS)) {
+		// Setting FSYNC_INT_MODE_EN bit
+		if (i2c_read(st.hw->addr, MPU9250_INT_PIN_CFG, 1, &data))
+			return -1;
 
-	data |= (1 << 2);
+		data |= (1 << 2);
 
-	if (i2c_write(st.hw->addr, MPU9250_INT_PIN_CFG, 1, &data))
-		return -1;
+		if (i2c_write(st.hw->addr, MPU9250_INT_PIN_CFG, 1, &data))
+			return -1;
+	}
 
 	return 0;
 }

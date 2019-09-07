@@ -24,6 +24,10 @@
 #define __MAIN_H
 
 #ifdef __cplusplus
+#include <SparkFunMPU9250-DMP.h>
+#endif
+
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -33,7 +37,6 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -55,7 +58,11 @@ extern "C" {
 #define MPU_SAMPLE_RATE 100 //[Hz]
 #endif
 
+#define MPU_SENSORS_SET (INV_XYZ_GYRO | INV_XYZ_ACCEL) // | INV_XYZ_COMPASS)
+
+#define NUMBER_OF_SENSORS		3
 #define ENABLE_SENSORS_SYNCH	0
+#define PRINT_FULL_DATA			0
 
 /* USER CODE END EM */
 
@@ -108,7 +115,10 @@ void Error_Handler(void);
 //SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef 	huart1;
 extern volatile uint8_t 	isMpuMeasureReady;
+
 extern volatile uint8_t 	mpuDataToBeSend[75];
+extern volatile uint8_t		mpuDataLength;
+
 extern volatile bool		runMeasurement;
 extern volatile bool		firstMeasurementLoop;
 extern volatile uint16_t	timestampInterval;
