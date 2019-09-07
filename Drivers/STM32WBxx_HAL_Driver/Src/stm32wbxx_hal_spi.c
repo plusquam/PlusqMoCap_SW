@@ -198,6 +198,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32wbxx_hal.h"
 
+// Additional include
+#include "scheduler.h"
+
 /** @addtogroup STM32WBxx_HAL_Driver
   * @{
   */
@@ -925,6 +928,12 @@ HAL_StatusTypeDef HAL_SPI_Transmit(SPI_HandleTypeDef *hspi, uint8_t *pData, uint
           errorcode = HAL_TIMEOUT;
           goto error;
         }
+        // My part of the code
+        else
+        {
+        	SCH_Run(SCH_DEFAULT);
+        }
+        // end
       }
     }
   }
@@ -1070,6 +1079,12 @@ HAL_StatusTypeDef HAL_SPI_Receive(SPI_HandleTypeDef *hspi, uint8_t *pData, uint1
           errorcode = HAL_TIMEOUT;
           goto error;
         }
+        // My part of the code
+        else
+        {
+        	SCH_Run(SCH_DEFAULT);
+        }
+        // end
       }
     }
   }
@@ -1419,6 +1434,12 @@ HAL_StatusTypeDef HAL_SPI_TransmitReceive(SPI_HandleTypeDef *hspi, uint8_t *pTxD
         errorcode = HAL_TIMEOUT;
         goto error;
       }
+      // My part of the code
+      else
+      {
+      	SCH_Run(SCH_DEFAULT);
+      }
+      // end
     }
   }
 
