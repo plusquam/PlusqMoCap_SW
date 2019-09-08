@@ -71,7 +71,6 @@ PLACE_IN_SECTION("BLE_APP_CONTEXT") static P2P_Server_App_Context_t P2P_Server_A
 /* USER CODE BEGIN PFP */
 void P2PS_Send_Notification(void);
 void P2PS_APP_LED_BUTTON_context_Init(void);
-static void P2PS_Show_Config(void);
 
 /* USER CODE END PFP */
 
@@ -117,6 +116,13 @@ void P2PS_STM_App_Notification(P2PS_STM_App_Notification_evt_t *pNotification)
     			APP_DBG_MSG("-- Start/Stop measure command got\n\n");
     		}
     			break;
+    		case 'B': // Start calibration command
+			case 'b':
+			{
+				runCalibration = true;
+				APP_DBG_MSG("-- Start calibration command got\n\n");
+			}
+				break;
     		}
     	}
     }
@@ -175,7 +181,6 @@ void P2PS_APP_Init(void)
 {
 /* USER CODE BEGIN P2PS_APP_Init */
 	SCH_RegTask( CFG_TASK_MPU_DATA_READY_ID, P2PS_Send_Notification );
-	SCH_RegTask( CFG_TASK_READ_CFG_ID, P2PS_Show_Config );
 
 	/* App Context init */
 	P2P_Server_App_Context.Notification_Status=0;
@@ -238,54 +243,17 @@ void P2PS_APP_LED_BUTTON_context_Init(void){
 void P2PS_Send_Notification(void)
 {
    if(P2P_Server_App_Context.Notification_Status){
-	   if(mpuDataToBeSend[0] == 'S' || mpuDataToBeSend[0] == 'E') {
-		   while(P2PS_STM_App_Update_Char(P2P_NOTIFY_CHAR_UUID, (uint8_t*)mpuDataToBeSend, mpuDataLength))
-		   {
-			   APP_DBG_MSG("-- P2P APPLICATION SERVER  : NOTIFY ERROR\n ");
-		   }
-
-		   HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
+	   while(P2PS_STM_App_Update_Char(P2P_NOTIFY_CHAR_UUID, (uint8_t*)mpuDataToBeSend, mpuDataLength))
+	   {
+		   APP_DBG_MSG("-- P2P APPLICATION SERVER  : NOTIFY ERROR\n ");
 	   }
+
+	   HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
    } else {
     APP_DBG_MSG("-- P2P APPLICATION SERVER : CAN'T INFORM CLIENT -  NOTIFICATION DISABLED\n ");
    }
 
   return;
-}
-
-static void P2PS_Show_Config(void)
-{
-#if(CFG_DEBUG_APP_TRACE != 0)
-	uint16_t supportedMaxTxOctets;
-	uint16_t supportedMaxTxTime;
-	uint16_t supportedMaxRxOctets;
-	uint16_t supportedMaxRxTime;
-	tBleStatus result = hci_le_read_maximum_data_length(&supportedMaxTxOctets,
-														&supportedMaxTxTime,
-														&supportedMaxRxOctets,
-														&supportedMaxRxTime);
-	if(!result)
-	  APP_DBG_MSG("-- CONFIG: %d, %d, %d, %d\n", supportedMaxTxOctets,
-				  supportedMaxTxTime, supportedMaxRxOctets, supportedMaxRxTime);
-	else
-		APP_DBG_MSG("-- hci_le_read_maximum_data_length error\n");
-
-	uint8_t TX_PHY;
-	uint8_t RX_PHY;
-	result = hci_le_read_phy(P2P_Server_App_Context.ConnectionHandle, &TX_PHY, &RX_PHY);
-	if(!result)
-	  APP_DBG_MSG("-- PHY: %d, %d\n", TX_PHY, RX_PHY);
-	else
-		APP_DBG_MSG("-- hci_le_read_phy error\n");
-
-	uint16_t	HC_LE_ACL_Data_Packet_Length;
-	uint8_t 	HC_Total_Num_LE_ACL_Data_Packets;
-	result = hci_le_read_buffer_size(&HC_LE_ACL_Data_Packet_Length, &HC_Total_Num_LE_ACL_Data_Packets);
-	if(!result)
-	  APP_DBG_MSG("-- Packet length: %d, Packets nr %d\n", HC_LE_ACL_Data_Packet_Length, HC_Total_Num_LE_ACL_Data_Packets);
-	else
-		APP_DBG_MSG("-- hci_le_read_buffer_size error\n");
-	#endif
 }
 /* USER CODE END FD_LOCAL_FUNCTIONS*/
 

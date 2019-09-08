@@ -83,7 +83,7 @@ SpiSlaveHandler_t spiSlavesArray[] =
 #endif
 
 static MPU9250_DMP 	IMUs[NUMBER_OF_SENSORS];
-volatile uint8_t 	isMpuMeasureReady = 0u;
+volatile bool 		isMpuMeasureReady = false;
 
 volatile uint8_t 	mpuDataToBeSend[75];
 volatile uint8_t	mpuDataLength = 0u;
@@ -91,6 +91,8 @@ volatile uint8_t	mpuDataLength = 0u;
 volatile bool		runMeasurement = false;
 volatile bool		firstMeasurementLoop = true;
 volatile uint16_t	timestampInterval = 0u;
+
+volatile bool		runCalibration = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -112,6 +114,7 @@ static void InitialMpuProcedure(void);
 static void ReadMpuDataCallback(void);
 static void SetupMPUSensors(void);
 static void MeasurementLoop(void);
+static void PerformCalibration(void);
 bool test_whoAmI(void);
 /* USER CODE END PFP */
 
@@ -167,7 +170,11 @@ int main(void)
 ////////////////// LOOP START ///////////////////////////
   while (1)
   {
-	  MeasurementLoop();
+	  if(runCalibration)
+		  PerformCalibration();
+
+	  if(runMeasurement)
+		  MeasurementLoop();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -764,24 +771,9 @@ void HAL_Delay(uint32_t Delay)
 
 void MeasurementLoop(void)
 {
+	////////////////// MEASUREMENT START //////////////////////
 	firstMeasurementLoop = true;
 
-	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-	{
-		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-		IMUs[i].resetDevice();
-	}
-	printf("Sensors reset.\n");
-
-	///// FILL MOCK DATA ///////
-	mpuDataToBeSend[0] = 'S';
-
-	////////////////// MEASUREMENT START //////////////////////
-	printf("Waiting for measurement start command...\n");
-	while(!runMeasurement)
-	{
-	  delay_ms(20);
-	}
 	printf("Measurement start.\n");
 
 	////////////////// SENSORS SETUP //////////////////////////
@@ -818,7 +810,7 @@ void MeasurementLoop(void)
 
 	uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
 	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
-	isMpuMeasureReady = 1u;
+	isMpuMeasureReady = true;
 	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
 	////////////////// MEASUREMENT LOOP START ///////////////////////////
@@ -834,16 +826,99 @@ void MeasurementLoop(void)
 
 	primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
 	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
-	isMpuMeasureReady = 0u;
+	isMpuMeasureReady = false;
 	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
 	////////////////// DISABLE MPU9250 INTERRUPT /////////////////////////
 	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
 	IMUs[0].enableInterrupt(0);
 
-	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-
 	printf("Measurement stopped.\n\n");
+
+	////////////////// SENSORS RESET //////////////////////////
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		IMUs[i].resetDevice();
+	}
+	printf("Sensors reset.\n");
+
+	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+}
+
+
+
+void PerformCalibration(void)
+{
+	constexpr int numberOfSamples = 200;
+	runCalibration = false;
+	printf("Calibration begin...\n");
+	////////////////// SENSORS SETUP //////////////////////////
+	SetupMPUSensors();
+
+	int64_t mean_acc_x[NUMBER_OF_SENSORS] = {0}, mean_acc_y[NUMBER_OF_SENSORS] = {0}, mean_acc_z[NUMBER_OF_SENSORS] = {0};
+	int64_t mean_gyro_x[NUMBER_OF_SENSORS] = {0}, mean_gyro_y[NUMBER_OF_SENSORS] = {0}, mean_gyro_z[NUMBER_OF_SENSORS] = {0};
+
+	////////////////// CALIBRATION //////////////////////////
+	for(uint8_t sample = 0; sample < numberOfSamples; ++sample) {
+		for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)	{
+			set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+
+			while(!IMUs[i].dataReady())
+			{
+				delay_ms(1);
+			}
+
+			if( IMUs[i].allDataUpdate(NULL, 0) == INV_SUCCESS ) {
+				mean_acc_x[i] += IMUs[i].ax;
+				mean_acc_y[i] += IMUs[i].ay;
+				mean_acc_z[i] += IMUs[i].az;
+
+				mean_gyro_x[i] += IMUs[i].gx;
+				mean_gyro_y[i] += IMUs[i].gy;
+				mean_gyro_z[i] += IMUs[i].gz;
+			}
+		}
+
+		if(sample % 10 == 0)
+			printf("Sample %d done.\n", sample);
+	}
+
+	printf("\nCalculating mean values...\n");
+	mpuDataToBeSend[0] = 'B';
+
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)	{
+		mean_acc_x[i] /= numberOfSamples;
+		mean_acc_y[i] /= numberOfSamples;
+		mean_acc_z[i] /= numberOfSamples;
+		mean_acc_z[i] -= IMUs[i].getAccelSens();
+
+		mean_gyro_x[i] /= numberOfSamples;
+		mean_gyro_y[i] /= numberOfSamples;
+		mean_gyro_z[i] /= numberOfSamples;
+
+		uint8_t offset = i * 12u + 1;
+		mpuDataToBeSend[offset] = (uint8_t)(mean_acc_x[i] >> 8);
+		mpuDataToBeSend[offset + 1] = (uint8_t)mean_acc_x[i];
+		mpuDataToBeSend[offset + 2] = (uint8_t)(mean_acc_y[i] >> 8);
+		mpuDataToBeSend[offset + 3] = (uint8_t)mean_acc_y[i];
+		mpuDataToBeSend[offset + 4] = (uint8_t)(mean_acc_z[i] >> 8);
+		mpuDataToBeSend[offset + 5] = (uint8_t)mean_acc_z[i];
+
+		offset += 6;
+		mpuDataToBeSend[offset] = (uint8_t)(mean_gyro_x[i] >> 8);
+		mpuDataToBeSend[offset + 1] = (uint8_t)mean_gyro_x[i];
+		mpuDataToBeSend[offset + 2] = (uint8_t)(mean_gyro_y[i] >> 8);
+		mpuDataToBeSend[offset + 3] = (uint8_t)mean_gyro_y[i];
+		mpuDataToBeSend[offset + 4] = (uint8_t)(mean_gyro_z[i] >> 8);
+		mpuDataToBeSend[offset + 5] = (uint8_t)mean_gyro_z[i];
+	}
+	mpuDataLength = NUMBER_OF_SENSORS * 12u + 1;
+
+	// Send calibration data
+	SCH_SetTask(1<<CFG_TASK_MPU_DATA_READY_ID, CFG_SCH_PRIO_1);
+
+	printf("\nCalibration done.\n");
 }
 
 
@@ -865,7 +940,7 @@ void ReadMpuDataCallback(void)
 		mpuDataToBeSend[2] = (uint8_t)timestampInterval;
 		IMUs[0].time = timestampInterval;
 
-		isMpuMeasureReady = 0u;
+		isMpuMeasureReady = false;
 		__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
 #if PRINT_FULL_DATA
@@ -958,7 +1033,7 @@ void ReadMpuDataCallback(void)
 
 		primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
 		__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
-		isMpuMeasureReady = 1u;
+		isMpuMeasureReady = true;
 	}
 
 	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
@@ -982,6 +1057,8 @@ void InitialMpuProcedure(void)
 			printf("Sensor nr %d check fail! Try again.\n", i);
 			delay_ms(500);
 		}
+
+		IMUs[i].resetDevice();
 	}
 
 	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);

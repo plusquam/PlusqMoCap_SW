@@ -114,7 +114,7 @@ void Error_Handler(void);
 
 //SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef 	huart1;
-extern volatile uint8_t 	isMpuMeasureReady;
+extern volatile bool 		isMpuMeasureReady;
 
 extern volatile uint8_t 	mpuDataToBeSend[75];
 extern volatile uint8_t		mpuDataLength;
@@ -122,6 +122,8 @@ extern volatile uint8_t		mpuDataLength;
 extern volatile bool		runMeasurement;
 extern volatile bool		firstMeasurementLoop;
 extern volatile uint16_t	timestampInterval;
+
+extern volatile bool		runCalibration;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
