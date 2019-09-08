@@ -42,7 +42,7 @@ static inline uint8_t spi_write_register(uint8_t reg_addr, uint8_t * data, uint8
 
 	returnVal |= HAL_SPI_Transmit(spi_handler, &reg_addr, 1u, 2u);
 	if(!returnVal)
-		returnVal |= HAL_SPI_Transmit(spi_handler, data, length, 1u * length + 1u);
+		returnVal |= HAL_SPI_Transmit(spi_handler, data, length, length + 1u);
 
 	HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_SET);
 
@@ -67,27 +67,40 @@ static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_
 	}
 #endif
 
-	if(length < 30)
-	{
-		reg_addr |= 0x80; //  MSB = 1 for reading operation
+	reg_addr |= 0x80; //  MSB = 1 for reading operation
 
-		HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_RESET);
-		uint8_t dummy_buffer[30] = {0};
-		delay_us(3);
+	HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_RESET);
+	uint8_t dummy_buffer[30] = {0};
+	delay_us(3);
 
-		returnVal |= HAL_SPI_Transmit(spi_handler, &reg_addr, 1u, 2u);
-		if(!returnVal)
-			returnVal |= HAL_SPI_TransmitReceive(spi_handler, dummy_buffer, data, length, 1u * length + 1u);
-		else
-			printf("SPI read init error!\n");
+	returnVal |= HAL_SPI_Transmit(spi_handler, &reg_addr, 1u, 2u);
+	if(!returnVal) {
+		if(length <= 30)	{
+			returnVal |= HAL_SPI_TransmitReceive(spi_handler, dummy_buffer, data, length, length + 1u);
+		}
+		else {
+			uint8_t temp_length = 30;
+			do
+			{
+				returnVal |= HAL_SPI_TransmitReceive(spi_handler, dummy_buffer, data, temp_length, temp_length + 1u);
 
-		HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_SET);
+				if(!returnVal) {
+					length -= temp_length;
+					if(length >= 30)
+						temp_length = 30;
+					else
+						temp_length = length % 30;
+				}
+				else
+					break;
+
+			} while(length > 0);
+		}
 	}
 	else
-	{
-		printf("Error: SPI read length exceeded: %d", length);
-		returnVal = 1u;
-	}
+		printf("SPI read init error!\n");
+
+	HAL_GPIO_WritePin(current_CS_port, current_CS_pin, GPIO_PIN_SET);
 
 #if SPI_SPEEDUP_FOR_SENSOR_DATA
 	// Restore SPI clock freq. for data registers
