@@ -78,6 +78,16 @@ SpiSlaveHandler_t spiSlavesArray[] =
 	[2] = {.number = 2, .port = SPI1_CS_2_GPIO_Port, .pin = SPI1_CS_2_Pin}
 };
 
+static constexpr uint8_t SLAVES_MASK(void)
+{
+	return (1 << 0) | (1 << 1) | (1 << 2); // Slaves: 0 | 1 | 2
+}
+
+static constexpr uint16_t MPU_SAMPLE_INTERVAL_MS(void)
+{
+	return 1000 / MPU_SAMPLE_RATE;
+}
+
 #ifndef NUMBER_OF_SENSORS
 #define NUMBER_OF_SENSORS (sizeof(spiSlavesArray)/sizeof(SpiSlaveHandler_t))
 #endif
@@ -644,16 +654,15 @@ void SetupMPUSensors(void)
 			IMUs[i].setIntLatched(INT_50US_PULSE);
 		}
 #endif
-	}
 
-	////////////////// Disable interrupts /////////////////////////////
-	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
-	if ( IMUs[0].enableInterrupt(0) != INV_SUCCESS)
-	while (1)
-	{
-		printf("Unable to disable interrupt.\n");
-		printf("Check connections, and try again.\n");
-		HAL_Delay(1000);
+		////////////////// Disable interrupts /////////////////////////////
+		if ( IMUs[i].enableInterrupt(0) != INV_SUCCESS)
+		while (1)
+		{
+			printf("Unable to disable interrupt.\n");
+			printf("Check connections, and try again.\n");
+			HAL_Delay(1000);
+		}
 	}
 
 	printf("Setup done.\n");
@@ -805,8 +814,11 @@ void MeasurementLoop(void)
 #endif
 
 	////////////////// ENABLE MPU9250 INTERRUPT /////////////////////////
-	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
-	IMUs[0].enableInterrupt(1);
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		IMUs[i].enableInterrupt(1);
+	}
 
 	uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
 	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
@@ -923,9 +935,9 @@ void PerformCalibration(void)
 
 
 
-static constexpr uint8_t calculateTimeout(void)
+static constexpr uint8_t MEASUREMENT_TIMEOUT(void)
 {
-	return (uint8_t)(1000 / MPU_SAMPLE_RATE) / 3;
+	return (uint8_t)MPU_SAMPLE_INTERVAL_MS() * 4;
 }
 
 
@@ -950,55 +962,77 @@ void ReadMpuDataCallback(void)
 
 		uint8_t error_result = 0u;
 
-		for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
-		{
-			set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+//#if (MPU_SENSORS_SET & INV_XYZ_COMPASS) && !MPU_DMP_DATA_ENABLE
+//		uint8_t		sensorsCompletedMask = 0u;
+//		uint32_t	startTime = HAL_GetTick();
+//
+//		while(	(sensorsCompletedMask != SLAVES_MASK()) &&
+//				(HAL_GetTick() < startTime + MEASUREMENT_TIMEOUT()) ) {
+//#endif
+			for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+			{
+//#if (MPU_SENSORS_SET & INV_XYZ_COMPASS) && !MPU_DMP_DATA_ENABLE
+//				if(sensorsCompletedMask & (1 << i)) // if sensor already read -> skip sensor
+//					continue;
+//#endif
+				set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
 
 #if MPU_DMP_DATA_ENABLE
-			// Check for new data in the FIFO
-			if (i == 0 )
-				while(!IMUs[i].fifoAvailable())
-				{
-					delay_ms(1);
-				}
+				// Check for new data in the FIFO
+				if (i == 0 )
+					while(!IMUs[i].fifoAvailable())
+					{
+						delay_ms(1);
+					}
 
-			// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
-			if ( IMUs[i].dmpUpdateFifo() == INV_SUCCESS)
-			{
-				// computeEulerAngles can be used -- after updating the
-				// quaternion values -- to estimate roll, pitch, and yaw
-	//			IMUs[i].computeEulerAngles();
-			}
-			else
-			{
-				printf("DMP update fifo read error!\n");
-			}
+				// Use dmpUpdateFifo to update the ax, gx, mx, etc. values
+				if ( IMUs[i].dmpUpdateFifo() == INV_SUCCESS)
+				{
+					// computeEulerAngles can be used -- after updating the
+					// quaternion values -- to estimate roll, pitch, and yaw
+					//IMUs[i].computeEulerAngles();
+				}
+				else
+				{
+					printf("DMP update fifo read error!\n");
+				}
 #else
 
-#if MPU_SENSORS_SET & INV_XYZ_COMPASS
-			if(i != 0) {
-				uint8_t timeout = (uint8_t)calculateTimeout();
-				while(!IMUs[i].dataReady() && timeout > 0)
-				{
-					// Wait until data is ready
-					delay_ms(1);
-					--timeout;
-				}
-			}
+	#if MPU_SENSORS_SET & INV_XYZ_COMPASS
+//				if(i != 0) {
+//					if(!IMUs[i].dataReady())
+//					{
+//						// If data for sensor 'i' is not ready -> go to another one
+//						continue;
+//					}
+//				}
 
-			// Update of IMU sensor data
-			if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3) != INV_SUCCESS) {
-				printf("IMU nr %d data read error!\n", i);
-				error_result = 1;
-			}
-#else
-			if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 12 + 3) != INV_SUCCESS) {
-				printf("IMU nr %d data read error!\n", i);
-				error_result = 1;
-			}
+				// Update of IMU sensor data
+				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3) == INV_ERROR) {
+					printf("IMU nr %d data read error!\n", i);
+					error_result = 1;
+				}
+				else {
+					// Add sensor to the completed mask
+//					sensorsCompletedMask |= (1 << i);
+				}
+	#else
+				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 12 + 3) != INV_SUCCESS) {
+					printf("IMU nr %d data read error!\n", i);
+					error_result = 1;
+				}
+				else {
+					error_result = 0;
+				}
+	#endif
 #endif
-#endif
-		}
+			}
+//#if (MPU_SENSORS_SET & INV_XYZ_COMPASS) && !MPU_DMP_DATA_ENABLE
+//		}
+
+//		if(sensorsCompletedMask == SLAVES_MASK())
+//			error_result = 0;
+//#endif
 
 		if(!error_result) {
 			mpuDataToBeSend[0] = 'S';

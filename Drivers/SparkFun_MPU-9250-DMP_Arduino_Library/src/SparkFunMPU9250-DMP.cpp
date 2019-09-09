@@ -763,10 +763,8 @@ inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offs
 
 		if(chosen_sensors & INV_XYZ_COMPASS) {
 			//Mag
-			if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
-				return -2;
-		//    if (data[21] & AKM_OVERFLOW)
-		//        return -3;
+			if (!(data[14] & AKM_DATA_READY))
+				return INV_NO_MAG_DATA;
 
 			short mag_sens_adj[3];
 			getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
@@ -782,11 +780,6 @@ inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offs
 	}
 	else
 	{
-		if(chosen_sensors & INV_XYZ_COMPASS) {
-			if (!(data[14] & AKM_DATA_READY)) // || (data[14] & AKM_DATA_OVERRUN))
-				return -2;
-		}
-
 		unsigned char *buffer_with_offset = buffer + offset;
 
 		// Acc
@@ -795,25 +788,34 @@ inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offs
 		//Gyro
 		memcpy(buffer_with_offset + 6, data + 8, sizeof(gx) * 3);
 
+		// Mag
 		if(chosen_sensors & INV_XYZ_COMPASS) {
-			// Mag
-			short temp_mx = (data[16] << 8) | data[15];
-			short temp_my = (data[18] << 8) | data[17];
-			short temp_mz = (data[20] << 8) | data[19];
+			if (data[14] & AKM_DATA_READY) {
 
-			short mag_sens_adj[3];
-			getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+				short temp_mx = (data[16] << 8) | data[15];
+				short temp_my = (data[18] << 8) | data[17];
+				short temp_mz = (data[20] << 8) | data[19];
 
-			temp_mx = ((long)temp_mx * mag_sens_adj[0]) >> 8;
-			temp_my = ((long)temp_my * mag_sens_adj[1]) >> 8;
-			temp_mz = ((long)temp_mz * mag_sens_adj[2]) >> 8;
+				short mag_sens_adj[3];
+				getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
 
-			buffer_with_offset[12] = (unsigned char)(temp_mx >> 8);
-			buffer_with_offset[13] = (unsigned char)temp_mx;
-			buffer_with_offset[14] = (unsigned char)(temp_mx >> 8);
-			buffer_with_offset[15] = (unsigned char)temp_mx;
-			buffer_with_offset[16] = (unsigned char)(temp_mx >> 8);
-			buffer_with_offset[17] = (unsigned char)temp_mx;
+				temp_mx = ((long)temp_mx * mag_sens_adj[0]) >> 8;
+				temp_my = ((long)temp_my * mag_sens_adj[1]) >> 8;
+				temp_mz = ((long)temp_mz * mag_sens_adj[2]) >> 8;
+
+				buffer_with_offset[12] = (unsigned char)(temp_mx >> 8);
+				buffer_with_offset[13] = (unsigned char)temp_mx;
+				buffer_with_offset[14] = (unsigned char)(temp_my >> 8);
+				buffer_with_offset[15] = (unsigned char)temp_my;
+				buffer_with_offset[16] = (unsigned char)(temp_mz >> 8);
+				buffer_with_offset[17] = (unsigned char)temp_mz;
+			}
+			else {
+				for(int index = 12; index < 17; ++index)
+					buffer_with_offset[index] = 0;
+
+				return INV_NO_MAG_DATA;
+			}
 		}
 	}
 

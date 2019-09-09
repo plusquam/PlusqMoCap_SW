@@ -61,7 +61,7 @@ static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_
 #if SPI_SPEEDUP_FOR_SENSOR_DATA
 	uint32_t CR1_old = spi_handler->Instance->CR1;
 	// Set higher SPI clock freq. for data registers
-	if((reg_addr >= MPU9250_ACCEL_XOUT_H) && ((reg_addr + length - 1) <= MPU9250_EXT_SENS_DATA_23)) {
+	if((reg_addr >= MPU9250_INT_STATUS) && ((reg_addr + length - 1) <= MPU9250_EXT_SENS_DATA_23)) {
 		__IO uint32_t CR1_new = (CR1_old & ~(0x00000007 << 3u)) | SPI_BAUDRATEPRESCALER_8;
 		WRITE_REG(spi_handler->Instance->CR1, CR1_new);
 	}
@@ -104,7 +104,7 @@ static inline uint8_t spi_read_register(uint8_t reg_addr, uint8_t * data, uint8_
 
 #if SPI_SPEEDUP_FOR_SENSOR_DATA
 	// Restore SPI clock freq. for data registers
-	if((reg_addr >= MPU9250_ACCEL_XOUT_H) && ((reg_addr + length - 1) <= MPU9250_EXT_SENS_DATA_23)) {
+	if((reg_addr >= MPU9250_INT_STATUS) && ((reg_addr + length - 1) <= MPU9250_EXT_SENS_DATA_23)) {
 		WRITE_REG(spi_handler->Instance->CR1, CR1_old);
 	}
 #endif

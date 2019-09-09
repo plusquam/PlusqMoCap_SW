@@ -31,8 +31,9 @@ extern "C" {
 }
 
 typedef int inv_error_t;
-#define INV_SUCCESS 0
-#define INV_ERROR 0x20
+#define INV_SUCCESS		0
+#define INV_ERROR		0x20
+#define INV_NO_MAG_DATA	0x30
 
 enum t_axisOrder {
 	X_AXIS, // 0

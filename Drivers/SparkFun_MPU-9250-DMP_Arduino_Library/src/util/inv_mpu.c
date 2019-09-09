@@ -377,10 +377,11 @@ enum lp_accel_rate_e {
 
 #define AKM_BIT_SELF_TEST   (0x40)
 
-#define AKM_POWER_DOWN          (0x00 | SUPPORTS_AK89xx_HIGH_SENS)
-#define AKM_SINGLE_MEASUREMENT  (0x01 | SUPPORTS_AK89xx_HIGH_SENS)
-#define AKM_FUSE_ROM_ACCESS     (0x0F | SUPPORTS_AK89xx_HIGH_SENS)
-#define AKM_MODE_SELF_TEST      (0x08 | SUPPORTS_AK89xx_HIGH_SENS)
+#define AKM_POWER_DOWN          		(0x00 | SUPPORTS_AK89xx_HIGH_SENS)
+#define AKM_SINGLE_MEASUREMENT  		(0x01 | SUPPORTS_AK89xx_HIGH_SENS)
+#define AKM_CONTINOUS_MEASUREMENT_2  	(0b0110 | SUPPORTS_AK89xx_HIGH_SENS) // 100 Hz data rate
+#define AKM_FUSE_ROM_ACCESS     		(0x0F | SUPPORTS_AK89xx_HIGH_SENS)
+#define AKM_MODE_SELF_TEST      		(0x08 | SUPPORTS_AK89xx_HIGH_SENS)
 
 #define AKM_WHOAMI      (0x48)
 #endif
@@ -1615,7 +1616,7 @@ int mpu_set_sensors(unsigned char sensors)
         return -1;
     /* Handle AKM power management. */
     if (sensors & INV_XYZ_COMPASS) {
-        data = AKM_SINGLE_MEASUREMENT;
+        data = AKM_CONTINOUS_MEASUREMENT_2;
         user_ctrl |= BIT_AUX_IF_EN;
     } else {
         data = AKM_POWER_DOWN;
@@ -1625,7 +1626,7 @@ int mpu_set_sensors(unsigned char sensors)
         user_ctrl |= BIT_DMP_EN;
     else
         user_ctrl &= ~BIT_DMP_EN;
-    if (i2c_write(st.hw->addr, st.reg->s1_do, 1, &data))
+    if (i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL, 1, &data))
         return -1;
     /* Enable/disable I2C master mode. */
     if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &user_ctrl))
@@ -2952,7 +2953,7 @@ static int setup_compass(void)
 #endif
 
     /* Set up master mode, master clock, and ES bit. */
-    data[0] = 0x40;
+    data[0] = 0x40 | 13u; // setting clock to 400kHz
     if (i2c_write(st.hw->addr, st.reg->i2c_mst, 1, data))
         return -1;
 
@@ -2971,28 +2972,13 @@ static int setup_compass(void)
     if (i2c_write(st.hw->addr, st.reg->s0_ctrl, 1, data))
         return -1;
 
-    /* Slave 1 changes AKM measurement mode. */
-    data[0] = st.chip_cfg.compass_addr;
-    if (i2c_write(st.hw->addr, st.reg->s1_addr, 1, data))
-        return -1;
-
-    /* AKM measurement mode register. */
-    data[0] = AKM_REG_CNTL;
-    if (i2c_write(st.hw->addr, st.reg->s1_reg, 1, data))
-        return -1;
-
-    /* Enable slave 1, 1-byte writes. */
-    data[0] = BIT_SLAVE_EN | 1;
-    if (i2c_write(st.hw->addr, st.reg->s1_ctrl, 1, data))
-        return -1;
-
     /* Set slave 1 data. */
-    data[0] = AKM_SINGLE_MEASUREMENT;
-    if (i2c_write(st.hw->addr, st.reg->s1_do, 1, data))
+    data[0] = AKM_CONTINOUS_MEASUREMENT_2;
+    if (i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL, 1, data))
         return -1;
 
-    /* Trigger slave 0 and slave 1 actions at each sample. */
-    data[0] = 0x03;
+    /* Trigger slave 0 actions at each sample. */
+    data[0] = 0x01;
     if (i2c_write(st.hw->addr, st.reg->i2c_delay_ctrl, 1, data))
         return -1;
 
