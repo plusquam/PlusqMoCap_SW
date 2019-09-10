@@ -580,8 +580,7 @@ int set_int_enable(unsigned char enable)
     } else {
         if (!st.chip_cfg.sensors)
             return -1;
-        if (enable && st.chip_cfg.int_enable)
-            return 0;
+            
         if (enable)
             tmp = BIT_DATA_RDY_EN;
         else

@@ -753,9 +753,6 @@ inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offs
 		ay = (data[2] << 8) | data[3];
 		az = (data[4] << 8) | data[5];
 
-		// Temperature // don't care now
-	//    temperature = TODO
-
 		//Gyro
 		gx = (data[8] << 8) | data[9];
 		gy = (data[10] << 8) | data[11];

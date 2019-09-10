@@ -46,53 +46,66 @@ static constexpr uint16_t MPU_SAMPLE_INTERVAL_MS(void)
 #endif
 
 static MPU9250_DMP 		IMUs[NUMBER_OF_SENSORS];
-static volatile bool	isMpuMeasureReady = false;
 
 volatile uint8_t 	mpuDataToBeSend[75];
 volatile uint8_t	mpuDataLength = 0u;
 
-volatile bool				runMeasurement = false;
-volatile bool				runCalibration = false;
+volatile bool				runMeasurement 		= true;
+volatile bool				runCalibration 		= false;
 static volatile bool		firstMeasurementLoop = true;
-static volatile uint16_t	timestampInterval = 0u;
+static volatile uint16_t	timestampInterval 	= 0u;
+static volatile bool		isMpuMeasureReady 	= false;
+static volatile uint8_t		readySensorsMask 	= 0u;
+static volatile bool		callbackCalled 		= false;
 
 
 ///////////////////// FUNCTIONS ///////////////////////////////
 void HAL_GPIO_EXTI_Callback( uint16_t GPIO_Pin )
 {
-	switch (GPIO_Pin)
+	if(isMpuMeasureReady)
 	{
-		case B1_Pin:
-			break;
-		case MPU_INT_0_Pin:
-			if(isMpuMeasureReady)
-			{
-				static volatile uint32_t	previousTimestamp = 0u;
-				uint32_t	currTimestamp = HAL_GetTick();
+		switch (GPIO_Pin)
+		{
+			case MPU_INT_0_Pin:
+				readySensorsMask |= (1 << 0); // sensor 0 ready
+				break;
+			case MPU_INT_1_Pin:
+				readySensorsMask |= (1 << 1); // sensor 1 ready
+				break;
+			case MPU_INT_2_Pin:
+				readySensorsMask |= (1 << 2); // sensor 2 ready
+				break;
+			case MPU_INT_3_Pin:
+				readySensorsMask |= (1 << 3); // sensor 3 ready
+				break;
+		}
 
-				if(firstMeasurementLoop) {
-					timestampInterval = 0u;
-					firstMeasurementLoop = false;
+		if((!callbackCalled) && (GPIO_Pin == MPU_INT_0_Pin)) {
+			static volatile uint32_t	previousTimestamp = 0u;
+			uint32_t currTimestamp = HAL_GetTick();
+
+			if(firstMeasurementLoop) {
+				timestampInterval = 0u;
+				firstMeasurementLoop = false;
+			}
+			else {
+				if(previousTimestamp < currTimestamp) {
+					timestampInterval = (uint16_t)(currTimestamp - previousTimestamp);
 				}
 				else {
-					if(previousTimestamp < currTimestamp) {
-						timestampInterval = (uint16_t)(currTimestamp - previousTimestamp);
-					}
-					else {
-						// Timer overflow
-						timestampInterval = (uint16_t)(currTimestamp + (~((uint32_t)0u) - previousTimestamp));
-					}
+					// Timer overflow
+					timestampInterval = (uint16_t)(currTimestamp + (~((uint32_t)0u) - previousTimestamp));
 				}
-
-				previousTimestamp = currTimestamp;
-				SCH_SetTask(1<<CFG_TASK_MPU9250_INT_ID, CFG_SCH_PRIO_0);
 			}
-			break;
-		default:
-			break;
+			previousTimestamp = currTimestamp;
+			SCH_SetTask(1<<CFG_TASK_MPU9250_INT_ID, CFG_SCH_PRIO_0);
+		}
+
 	}
 	return;
 }
+
+
 
 void SetupMPUSensors(void)
 {
@@ -154,25 +167,22 @@ void SetupMPUSensors(void)
 		IMUs[i].setCompassSampleRate(MPU_SAMPLE_RATE); // Set mag rate to 100 Hz
 #endif
 
-		if(i == 0)
-		{
-			// Use enableInterrupt() to configure the MPU-9250's
-			// interrupt output as a "data ready" indicator.
-	//		IMUs[i].enableInterrupt(1); Not yet
+		// Use enableInterrupt() to configure the MPU-9250's
+		// interrupt output as a "data ready" indicator.
+//		IMUs[i].enableInterrupt(1); Not yet
 
-			// The interrupt level can either be active-high or low.
-			// Configure as active-low, since we'll be using the pin's
-			// internal pull-up resistor.
-			// Options are INT_ACTIVE_LOW or INT_ACTIVE_HIGH
-			IMUs[i].setIntLevel(INT_ACTIVE_LOW);
+		// The interrupt level can either be active-high or low.
+		// Configure as active-low, since we'll be using the pin's
+		// internal pull-up resistor.
+		// Options are INT_ACTIVE_LOW or INT_ACTIVE_HIGH
+		IMUs[i].setIntLevel(INT_ACTIVE_LOW);
 
-			// The interrupt can be set to latch until data has
-			// been read, or to work as a 50us pulse.
-			// Use latching method -- we'll read from the sensor
-			// as soon as we see the pin go LOW.
-			// Options are INT_LATCHED or INT_50US_PULSE
-			IMUs[i].setIntLatched(INT_50US_PULSE);
-		}
+		// The interrupt can be set to latch until data has
+		// been read, or to work as a 50us pulse.
+		// Use latching method -- we'll read from the sensor
+		// as soon as we see the pin go LOW.
+		// Options are INT_LATCHED or INT_50US_PULSE
+		IMUs[i].setIntLatched(INT_50US_PULSE);
 #endif
 
 		////////////////// Disable interrupts /////////////////////////////
@@ -187,6 +197,8 @@ void SetupMPUSensors(void)
 
 	printf("Setup done.\n");
 }
+
+
 
 #if PRINT_FULL_DATA
 void printIMUData(uint8_t sensor_number)
@@ -262,6 +274,8 @@ void printIMUData(uint8_t sensor_number)
 }
 #endif
 
+
+
 bool test_whoAmI()
 {
 	uint8_t readData[5] = {0};
@@ -277,6 +291,8 @@ bool test_whoAmI()
 		return false;
 	}
 }
+
+
 
 void HAL_Delay(uint32_t Delay)
 {
@@ -318,17 +334,16 @@ void MeasurementLoop(void)
 	printf("Fifo reset done.\n");
 	#endif
 
+#if ENABLE_SENSORS_SYNCH
 	////////////////// ENABLE MPU9250 TRIGGER /////////////////////////
 	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 	{
 		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-#if ENABLE_SENSORS_SYNCH
+
 		mpu_set_fsync_configuration();
 		mpu_set_slave4_interrupt();
-#endif
 	}
 
-#if ENABLE_SENSORS_SYNCH
 	// Enable PWM signal for MPU triggering
 	MX_TIM1_Init();
 #endif
@@ -361,16 +376,14 @@ void MeasurementLoop(void)
 	isMpuMeasureReady = false;
 	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
-	////////////////// DISABLE MPU9250 INTERRUPT /////////////////////////
-	set_CS_portpin(spiSlavesArray[0].port, spiSlavesArray[0].pin);
-	IMUs[0].enableInterrupt(0);
-
 	printf("Measurement stopped.\n\n");
 
 	////////////////// SENSORS RESET //////////////////////////
 	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 	{
+		////////////////// DISABLE MPU9250 INTERRUPT /////////////////////////
 		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		IMUs[i].enableInterrupt(0);
 		IMUs[i].resetDevice();
 	}
 	printf("Sensors reset.\n");
@@ -457,7 +470,7 @@ void PerformCalibration(void)
 
 static constexpr uint8_t MEASUREMENT_TIMEOUT(void)
 {
-	return (uint8_t)MPU_SAMPLE_INTERVAL_MS() * 4;
+	return (uint8_t)MPU_SAMPLE_INTERVAL_MS() * 2;
 }
 
 
@@ -467,12 +480,12 @@ void ReadMpuDataCallback(void)
 	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
 	if(isMpuMeasureReady)
 	{
+		callbackCalled = true;
 		// Get timestamp
 		mpuDataToBeSend[1] = (uint8_t)(timestampInterval >> 8);
 		mpuDataToBeSend[2] = (uint8_t)timestampInterval;
 		IMUs[0].time = timestampInterval;
 
-		isMpuMeasureReady = false;
 		__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
 #if PRINT_FULL_DATA
@@ -480,21 +493,25 @@ void ReadMpuDataCallback(void)
 		static constexpr uint8_t numOfItersToPrint = MPU_SAMPLE_RATE/3; // value set for 1Hz printf refresh rate
 #endif
 
-		uint8_t error_result = 0u;
+		uint8_t error_result_mask = 0u;
 
-//#if (MPU_SENSORS_SET & INV_XYZ_COMPASS) && !MPU_DMP_DATA_ENABLE
-//		uint8_t		sensorsCompletedMask = 0u;
-//		uint32_t	startTime = HAL_GetTick();
-//
-//		while(	(sensorsCompletedMask != SLAVES_MASK()) &&
-//				(HAL_GetTick() < startTime + MEASUREMENT_TIMEOUT()) ) {
-//#endif
+#if !MPU_DMP_DATA_ENABLE
+		uint8_t		sensorsCompletedMask = 0u;
+		uint32_t	startTime = HAL_GetTick();
+
+		while(	(sensorsCompletedMask != SLAVES_MASK()) &&
+				(HAL_GetTick() < startTime + MEASUREMENT_TIMEOUT()) )
+		{
+#endif
 			for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 			{
-//#if (MPU_SENSORS_SET & INV_XYZ_COMPASS) && !MPU_DMP_DATA_ENABLE
-//				if(sensorsCompletedMask & (1 << i)) // if sensor already read -> skip sensor
-//					continue;
-//#endif
+
+#if !MPU_DMP_DATA_ENABLE
+				uint8_t sensorShiftedNumber = 1 << i;
+				// if sensor already read or sensor not ready -> skip sensor
+				if((sensorShiftedNumber & sensorsCompletedMask) || !(sensorShiftedNumber & readySensorsMask))
+					continue;
+#endif
 				set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
 
 #if MPU_DMP_DATA_ENABLE
@@ -518,43 +535,37 @@ void ReadMpuDataCallback(void)
 				}
 #else
 
-	#if MPU_SENSORS_SET & INV_XYZ_COMPASS
-//				if(i != 0) {
-//					if(!IMUs[i].dataReady())
-//					{
-//						// If data for sensor 'i' is not ready -> go to another one
-//						continue;
-//					}
-//				}
-
 				// Update of IMU sensor data
-				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3) == INV_ERROR) {
+#if MPU_SENSORS_SET & INV_XYZ_COMPASS
+				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3) != INV_SUCCESS)
+#else
+				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 12 + 3) != INV_SUCCESS)
+#endif
+				{
 					printf("IMU nr %d data read error!\n", i);
-					error_result = 1;
+					error_result_mask |= sensorShiftedNumber;
 				}
-				else {
-					// Add sensor to the completed mask
-//					sensorsCompletedMask |= (1 << i);
-				}
-	#else
-				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 12 + 3) != INV_SUCCESS) {
-					printf("IMU nr %d data read error!\n", i);
-					error_result = 1;
-				}
-				else {
-					error_result = 0;
-				}
-	#endif
+
+				// Add sensor to the completed mask and clear sensor ready bit
+				sensorsCompletedMask |= sensorShiftedNumber;
+
+				primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
+				__disable_irq();
+				readySensorsMask &= ~sensorShiftedNumber;
+				__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
+
 #endif
 			}
-//#if (MPU_SENSORS_SET & INV_XYZ_COMPASS) && !MPU_DMP_DATA_ENABLE
-//		}
+#if !MPU_DMP_DATA_ENABLE
+		}
 
-//		if(sensorsCompletedMask == SLAVES_MASK())
-//			error_result = 0;
-//#endif
+		if(sensorsCompletedMask != SLAVES_MASK()) {
+			printf("Sensor mask doesn't match!\n");
+			error_result_mask = 0xff;
+		}
+#endif
 
-		if(!error_result) {
+		if(!error_result_mask) {
 			mpuDataToBeSend[0] = 'S';
 #if MPU_SENSORS_SET & INV_XYZ_COMPASS
 			mpuDataLength = NUMBER_OF_SENSORS * 18 + 3;
@@ -587,7 +598,7 @@ void ReadMpuDataCallback(void)
 
 		primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
 		__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
-		isMpuMeasureReady = true;
+		callbackCalled = false;
 	}
 
 	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
