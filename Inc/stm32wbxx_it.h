@@ -60,7 +60,9 @@ void RTC_WKUP_IRQHandler(void);
 void EXTI0_IRQHandler(void);
 void EXTI4_IRQHandler(void);
 void DMA1_Channel1_IRQHandler(void);
+void EXTI9_5_IRQHandler(void);
 void USART1_IRQHandler(void);
+void EXTI15_10_IRQHandler(void);
 /* USER CODE BEGIN EFP */
 
 void IPCC_C1_TX_IRQHandler(void);

@@ -113,9 +113,8 @@ void HAL_GPIO_EXTI_Callback( uint16_t GPIO_Pin )
 	switch (GPIO_Pin)
 	{
 		case B1_Pin:
-//			SCH_SetTask(1<<CFG_TASK_MPU_DATA_READY_ID, CFG_SCH_PRIO_1);
 			break;
-		case MPU_INT_Pin:
+		case MPU_INT_0_Pin:
 			if(isMpuMeasureReady)
 			{
 				static volatile uint32_t	previousTimestamp = 0u;
@@ -138,8 +137,6 @@ void HAL_GPIO_EXTI_Callback( uint16_t GPIO_Pin )
 				previousTimestamp = currTimestamp;
 				SCH_SetTask(1<<CFG_TASK_MPU9250_INT_ID, CFG_SCH_PRIO_0);
 			}
-//			else
-//				printf("NotReady\n");
 			break;
 		default:
 			break;

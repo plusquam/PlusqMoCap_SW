@@ -42,6 +42,7 @@
 									<listOptionValue builtIn="false" value="STM32WB55xx"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.option.includepaths.832278765" name="Include paths (-I)" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.option.includepaths" useByScannerDiscovery="false" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src/util}&quot;"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Src/blesvc"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/interface/patterns/ble_thread/tl"/>
@@ -50,6 +51,7 @@
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Src/core"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Inc/core"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src}&quot;"/>
 									<listOptionValue builtIn="false" value="../Drivers/STM32WBxx_HAL_Driver/Inc"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/utilities"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/interface/patterns/ble_thread/shci"/>
@@ -58,8 +60,6 @@
 									<listOptionValue builtIn="false" value="../Drivers/STM32WBxx_HAL_Driver/Inc/Legacy"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Inc/blesvc"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32WBxx/Include"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src/util}&quot;"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.1731086709" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c"/>
 							</tool>
@@ -73,6 +73,7 @@
 									<listOptionValue builtIn="false" value="STM32WB55xx"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.includepaths.1953068091" name="Include paths (-I)" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.includepaths" useByScannerDiscovery="false" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src/util}&quot;"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Src/blesvc"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/interface/patterns/ble_thread/tl"/>
@@ -81,6 +82,7 @@
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Src/core"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Inc/core"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src}&quot;"/>
 									<listOptionValue builtIn="false" value="../Drivers/STM32WBxx_HAL_Driver/Inc"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/utilities"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/interface/patterns/ble_thread/shci"/>
@@ -89,8 +91,6 @@
 									<listOptionValue builtIn="false" value="../Drivers/STM32WBxx_HAL_Driver/Inc/Legacy"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Inc/blesvc"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32WBxx/Include"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src/util}&quot;"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.input.cpp.100864771" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.input.cpp"/>
 							</tool>
@@ -164,7 +164,6 @@
 									<listOptionValue builtIn="false" value="STM32WB55xx"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.option.includepaths.3977721" name="Include paths (-I)" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.option.includepaths" useByScannerDiscovery="false" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src/util}&quot;"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Src/blesvc"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble"/>
@@ -174,6 +173,7 @@
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Src/core"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Inc/core"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src}&quot;"/>
 									<listOptionValue builtIn="false" value="../Drivers/STM32WBxx_HAL_Driver/Inc"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/utilities"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/interface/patterns/ble_thread/shci"/>
@@ -194,7 +194,6 @@
 									<listOptionValue builtIn="false" value="STM32WB55xx"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.includepaths.1971523556" name="Include paths (-I)" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.includepaths" useByScannerDiscovery="false" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src/util}&quot;"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Src/blesvc"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble"/>
@@ -204,6 +203,7 @@
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Src/core"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/ble/core/Inc/core"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Drivers/SparkFun_MPU-9250-DMP_Arduino_Library/src}&quot;"/>
 									<listOptionValue builtIn="false" value="../Drivers/STM32WBxx_HAL_Driver/Inc"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/utilities"/>
 									<listOptionValue builtIn="false" value="../Middlewares/ST/STM32_WPAN/interface/patterns/ble_thread/shci"/>
