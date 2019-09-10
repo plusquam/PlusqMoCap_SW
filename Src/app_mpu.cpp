@@ -159,11 +159,6 @@ void SetupMPUSensors(void)
 				HAL_Delay(1000);
 			}
 #else
-		// Setting sensors sensitivity and DLPF
-		IMUs[i].setAccelFSR(MPU_ACCEL_FSR);
-		IMUs[i].setGyroFSR(MPU_GYRO_FSR);
-		IMUs[i].setLPF(MPU_DLPF_BAND);
-
 		// Enable all sensors, and set sample rates to 4Hz.
 		// (Slow so we can see the interrupt work.)
 		IMUs[i].setSensors(MPU_SENSORS_SET);
@@ -172,6 +167,11 @@ void SetupMPUSensors(void)
 #if MPU_SENSORS_SET & INV_XYZ_COMPASS
 		IMUs[i].setCompassSampleRate(MPU_SAMPLE_RATE); // Set mag rate to 100 Hz
 #endif
+
+		// Setting sensors sensitivity and DLPF
+		IMUs[i].setAccelFSR(MPU_ACCEL_FSR);
+		IMUs[i].setGyroFSR(MPU_GYRO_FSR);
+		IMUs[i].setLPF(MPU_DLPF_BAND);
 
 		// Use enableInterrupt() to configure the MPU-9250's
 		// interrupt output as a "data ready" indicator.
@@ -476,7 +476,7 @@ void PerformCalibration(void)
 
 static constexpr uint8_t MEASUREMENT_TIMEOUT(void)
 {
-	return (uint8_t)MPU_SAMPLE_INTERVAL_MS() * 2;
+	return (uint8_t)MPU_SAMPLE_INTERVAL_MS() * 3;
 }
 
 
