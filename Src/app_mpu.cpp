@@ -50,7 +50,7 @@ static MPU9250_DMP 		IMUs[NUMBER_OF_SENSORS];
 volatile uint8_t 	mpuDataToBeSend[75];
 volatile uint8_t	mpuDataLength = 0u;
 
-volatile bool				runMeasurement 		= true;
+volatile bool				runMeasurement 		= false;
 volatile bool				runCalibration 		= false;
 static volatile bool		firstMeasurementLoop = true;
 static volatile uint16_t	timestampInterval 	= 0u;
@@ -158,6 +158,11 @@ void SetupMPUSensors(void)
 				HAL_Delay(1000);
 			}
 #else
+		// Setting sensors sensitivity and DLPF
+		IMUs[i].setAccelFSR(MPU_ACCEL_FSR);
+		IMUs[i].setGyroFSR(MPU_GYRO_FSR);
+		IMUs[i].setLPF(MPU_DLPF_BAND);
+
 		// Enable all sensors, and set sample rates to 4Hz.
 		// (Slow so we can see the interrupt work.)
 		IMUs[i].setSensors(MPU_SENSORS_SET);
@@ -537,9 +542,9 @@ void ReadMpuDataCallback(void)
 
 				// Update of IMU sensor data
 #if MPU_SENSORS_SET & INV_XYZ_COMPASS
-				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3) != INV_SUCCESS)
+				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3) == INV_ERROR)
 #else
-				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 12 + 3) != INV_SUCCESS)
+				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 12 + 3) == INV_ERROR)
 #endif
 				{
 					printf("IMU nr %d data read error!\n", i);
