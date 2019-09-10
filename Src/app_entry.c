@@ -108,42 +108,6 @@ void APPE_Init( void )
 }
 /* USER CODE BEGIN FD */
 
-void HAL_GPIO_EXTI_Callback( uint16_t GPIO_Pin )
-{
-	switch (GPIO_Pin)
-	{
-		case B1_Pin:
-			break;
-		case MPU_INT_0_Pin:
-			if(isMpuMeasureReady)
-			{
-				static volatile uint32_t	previousTimestamp = 0u;
-				uint32_t	currTimestamp = HAL_GetTick();
-
-				if(firstMeasurementLoop) {
-					timestampInterval = 0u;
-					firstMeasurementLoop = false;
-				}
-				else {
-					if(previousTimestamp < currTimestamp) {
-						timestampInterval = (uint16_t)(currTimestamp - previousTimestamp);
-					}
-					else {
-						// Timer overflow
-						timestampInterval = (uint16_t)(currTimestamp + (~((uint32_t)0u) - previousTimestamp));
-					}
-				}
-
-				previousTimestamp = currTimestamp;
-				SCH_SetTask(1<<CFG_TASK_MPU9250_INT_ID, CFG_SCH_PRIO_0);
-			}
-			break;
-		default:
-			break;
-	}
-	return;
-}
-
 /* USER CODE END FD */
 
 /*************************************************************

@@ -33,6 +33,7 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdbool.h>
+
 #ifdef __cplusplus
 #include <SparkFunMPU9250-DMP.h>
 #endif
@@ -50,18 +51,6 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-#define MPU_DMP_DATA_ENABLE	0 // Set to 0 for raw sensor data, 1 for DMP data
-#if MPU_DMP_DATA_ENABLE
-#define MPU_SAMPLE_RATE 200 //[Hz]
-#else
-#define MPU_SAMPLE_RATE 100 //[Hz]
-#endif
-
-#define MPU_SENSORS_SET (INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS)
-
-#define NUMBER_OF_SENSORS		3
-#define ENABLE_SENSORS_SYNCH	0
-#define PRINT_FULL_DATA			0
 
 /* USER CODE END EM */
 
@@ -118,19 +107,7 @@ void Error_Handler(void);
 #define STLINK_TX_Pin GPIO_PIN_7
 #define STLINK_TX_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
-
-//SPI_HandleTypeDef hspi1;
-extern UART_HandleTypeDef 	huart1;
-extern volatile bool 		isMpuMeasureReady;
-
-extern volatile uint8_t 	mpuDataToBeSend[75];
-extern volatile uint8_t		mpuDataLength;
-
-extern volatile bool		runMeasurement;
-extern volatile bool		firstMeasurementLoop;
-extern volatile uint16_t	timestampInterval;
-
-extern volatile bool		runCalibration;
+extern SPI_HandleTypeDef hspi1;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
