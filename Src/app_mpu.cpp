@@ -28,12 +28,13 @@ static SpiSlaveHandler_t spiSlavesArray[] =
 {
 	[0] = {.number = 0, .port = SPI1_CS_0_GPIO_Port, .pin = SPI1_CS_0_Pin},
 	[1] = {.number = 1, .port = SPI1_CS_1_GPIO_Port, .pin = SPI1_CS_1_Pin},
-	[2] = {.number = 2, .port = SPI1_CS_2_GPIO_Port, .pin = SPI1_CS_2_Pin}
+	[2] = {.number = 2, .port = SPI1_CS_2_GPIO_Port, .pin = SPI1_CS_2_Pin},
+	[3] = {.number = 3, .port = SPI1_CS_3_GPIO_Port, .pin = SPI1_CS_3_Pin}
 };
 
 static constexpr uint8_t SLAVES_MASK(void)
 {
-	return (1 << 0) | (1 << 1) | (1 << 2); // Slaves: 0 | 1 | 2
+	return (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3); // Slaves: 0 | 1 | 2 | 3
 }
 
 static constexpr uint16_t MPU_SAMPLE_INTERVAL_MS(void)
