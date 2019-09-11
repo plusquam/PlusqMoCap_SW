@@ -370,6 +370,16 @@ void MeasurementLoop(void)
 		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
 		IMUs[i].enableInterrupt(1);
 	}
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		while(mpu_read_int_enable() != 0x01) {
+			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+			printf("Enabling interrupt error!\n");
+			IMUs[i].enableInterrupt(1);
+			HAL_Delay(1);
+		}
+	}
 
 	uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
 	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
@@ -438,6 +448,17 @@ void PerformCalibration(void)
 		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
 		IMUs[i].enableInterrupt(1);
 	}
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		while(mpu_read_int_enable() != 0x01) {
+			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+			printf("Enabling interrupt error!\n");
+			IMUs[i].enableInterrupt(1);
+			HAL_Delay(1);
+		}
+	}
+
 
 	uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
 	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/

@@ -136,6 +136,7 @@ void getMagSensAdj(short *mag_sens_adj_x, short *mag_sens_adj_y, short *mag_sens
 int mpu_reset(void);
 int mpu_set_slave4_interrupt(void);
 int mpu_set_fsync_configuration(void);
+unsigned char mpu_read_int_enable(void);
 
 #endif  /* #ifndef _INV_MPU_H_ */
 

@@ -388,6 +388,8 @@ private:
 	short _aSense;
 	float _gSense, _mSense;
 	
+	short mag_sens_adj_x = 0, mag_sens_adj_y = 0, mag_sens_adj_z = 0;
+
 	// Convert a QN-format number to a float
 	float qToFloat(long number, unsigned char q);
 	unsigned short orientation_row_2_scale(const signed char *row);

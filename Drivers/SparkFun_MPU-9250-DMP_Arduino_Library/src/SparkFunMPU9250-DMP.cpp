@@ -57,6 +57,8 @@ inv_error_t MPU9250_DMP::begin(void)
 	_gSense = getGyroSens();
 	_aSense = getAccelSens();
 	
+	getMagSensAdj(&mag_sens_adj_x, &mag_sens_adj_y, &mag_sens_adj_z);
+
 	return result;
 }
 
@@ -761,16 +763,14 @@ inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offs
 		if(chosen_sensors & INV_XYZ_COMPASS) {
 			//Mag
 			if (data[14] & AKM_DATA_READY) {
-				short mag_sens_adj[3];
-				getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
 
 				mx = (data[16] << 8) | data[15];
 				my = (data[18] << 8) | data[17];
 				mz = (data[20] << 8) | data[19];
 
-				mx = ((long)mx * mag_sens_adj[0]) >> 8;
-				my = ((long)my * mag_sens_adj[1]) >> 8;
-				mz = ((long)mz * mag_sens_adj[2]) >> 8;
+				mx = ((long)mx * mag_sens_adj_x) >> 8;
+				my = ((long)my * mag_sens_adj_y) >> 8;
+				mz = ((long)mz * mag_sens_adj_z) >> 8;
 			}
 			else {
 				mx = 0;
@@ -798,12 +798,9 @@ inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offs
 				short temp_my = (data[18] << 8) | data[17];
 				short temp_mz = (data[20] << 8) | data[19];
 
-				short mag_sens_adj[3];
-				getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
-
-				temp_mx = ((long)temp_mx * mag_sens_adj[0]) >> 8;
-				temp_my = ((long)temp_my * mag_sens_adj[1]) >> 8;
-				temp_mz = ((long)temp_mz * mag_sens_adj[2]) >> 8;
+				temp_mx = ((long)temp_mx * mag_sens_adj_x) >> 8;
+				temp_my = ((long)temp_my * mag_sens_adj_y) >> 8;
+				temp_mz = ((long)temp_mz * mag_sens_adj_z) >> 8;
 
 				buffer_with_offset[12] = (unsigned char)(temp_mx >> 8);
 				buffer_with_offset[13] = (unsigned char)temp_mx;

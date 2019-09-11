@@ -3320,6 +3320,13 @@ int mpu_set_fsync_configuration()
 
 	return 0;
 }
+
+unsigned char mpu_read_int_enable()
+{
+	uint8_t reg;
+    i2c_read(st.hw->addr, st.reg->int_enable, 1, &reg);
+    return reg;
+}
 /**
  *  @}
  */
