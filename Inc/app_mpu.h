@@ -27,6 +27,12 @@
 #define ENABLE_SENSORS_SYNCH	0
 #define PRINT_FULL_DATA			0
 
+#if MPU_SENSORS_SET & INV_XYZ_COMPASS
+#define MPU_DATA_LENGTH_FOR_SENSOR	18
+#else
+#define MPU_DATA_LENGTH_FOR_SENSOR	12
+#endif
+
 
 // Variable declarations
 extern UART_HandleTypeDef 	huart1;

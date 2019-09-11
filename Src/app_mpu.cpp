@@ -479,6 +479,11 @@ static constexpr uint8_t MEASUREMENT_TIMEOUT(void)
 	return (uint8_t)MPU_SAMPLE_INTERVAL_MS() * 3;
 }
 
+static constexpr uint8_t MPU_ALL_DATA_LENGTH(void)
+{
+	return NUMBER_OF_SENSORS * MPU_DATA_LENGTH_FOR_SENSOR + 3;
+}
+
 
 void ReadMpuDataCallback(void)
 {
@@ -542,11 +547,7 @@ void ReadMpuDataCallback(void)
 #else
 
 				// Update of IMU sensor data
-#if MPU_SENSORS_SET & INV_XYZ_COMPASS
-				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 18 + 3) == INV_ERROR)
-#else
-				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * 12 + 3) == INV_ERROR)
-#endif
+				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * MPU_DATA_LENGTH_FOR_SENSOR + 3) == INV_ERROR)
 				{
 					printf("IMU nr %d data read error!\n", i);
 					error_result_mask |= sensorShiftedNumber;
@@ -573,11 +574,7 @@ void ReadMpuDataCallback(void)
 
 		if(!error_result_mask) {
 			mpuDataToBeSend[0] = 'S';
-#if MPU_SENSORS_SET & INV_XYZ_COMPASS
-			mpuDataLength = NUMBER_OF_SENSORS * 18 + 3;
-#else
-			mpuDataLength = NUMBER_OF_SENSORS * 12 + 3;
-#endif
+			mpuDataLength = MPU_ALL_DATA_LENGTH();
 			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 		}
 		else {
