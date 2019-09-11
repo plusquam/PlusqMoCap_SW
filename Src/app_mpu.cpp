@@ -642,22 +642,6 @@ void ReadMpuDataCallback(void)
 						printf("IMU nr %d data read error!\n", i);
 						error_result_mask |= sensorShiftedNumber;
 					}
-					else
-					{
-						mean_acc_x[i] += IMUs[i].ax;
-						mean_acc_y[i] += IMUs[i].ay;
-						mean_acc_z[i] += IMUs[i].az;
-
-						mean_gyro_x[i] += IMUs[i].gx;
-						mean_gyro_y[i] += IMUs[i].gy;
-						mean_gyro_z[i] += IMUs[i].gz;
-
-#if MPU_SENSORS_SET & INV_XYZ_COMPASS
-						mean_mag_x[i] += IMUs[i].mx;
-						mean_mag_y[i] += IMUs[i].my;
-						mean_mag_z[i] += IMUs[i].mz;
-#endif
-					}
 				}
 
 				// Add sensor to the completed mask and clear sensor ready bit
@@ -699,6 +683,22 @@ void ReadMpuDataCallback(void)
 		else // calibration mode
 		{
 			if(!error_result_mask) {
+				for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+				{
+					mean_acc_x[i] += IMUs[i].ax;
+					mean_acc_y[i] += IMUs[i].ay;
+					mean_acc_z[i] += IMUs[i].az;
+
+					mean_gyro_x[i] += IMUs[i].gx;
+					mean_gyro_y[i] += IMUs[i].gy;
+					mean_gyro_z[i] += IMUs[i].gz;
+
+#if MPU_SENSORS_SET & INV_XYZ_COMPASS
+					mean_mag_x[i] += IMUs[i].mx;
+					mean_mag_y[i] += IMUs[i].my;
+					mean_mag_z[i] += IMUs[i].mz;
+#endif
+				}
 				calibrationSamplesTaken++;
 				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 			}
