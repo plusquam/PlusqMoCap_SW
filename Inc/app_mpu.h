@@ -23,7 +23,7 @@
 #endif
 
 // Sensors settings
-#define MPU_SENSORS_SET 	(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS)
+#define MPU_SENSORS_SET 	(INV_XYZ_GYRO | INV_XYZ_ACCEL) //| INV_XYZ_COMPASS)
 #define MPU_ACCEL_FSR		4 	// +/- 4 G
 #define MPU_GYRO_FSR		500	// +/- 500 dps
 #define MPU_DLPF_BAND		98 	// 98 Hz
