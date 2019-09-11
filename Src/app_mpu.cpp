@@ -15,6 +15,7 @@ extern "C" {
 #include "scheduler.h"
 }
 #include <string.h>
+#include <cmath>
 
 typedef struct
 {
@@ -53,12 +54,20 @@ volatile uint8_t	mpuDataLength = 0u;
 
 volatile bool				runMeasurement 		= false;
 volatile bool				runCalibration 		= false;
+static bool					measurementMode		= true; // true => measurement mode, false => calibration mode
+
 static volatile bool		firstMeasurementLoop = true;
 static volatile uint16_t	timestampInterval 	= 0u;
 static volatile bool		isMpuMeasureReady 	= false;
 static volatile uint8_t		readySensorsMask 	= 0u;
 static volatile bool		callbackCalled 		= false;
 
+static uint16_t	calibrationSamplesTaken = 0;
+static int64_t	mean_acc_x[NUMBER_OF_SENSORS] = {0}, mean_acc_y[NUMBER_OF_SENSORS] = {0}, mean_acc_z[NUMBER_OF_SENSORS] = {0};
+static int64_t	mean_gyro_x[NUMBER_OF_SENSORS] = {0}, mean_gyro_y[NUMBER_OF_SENSORS] = {0}, mean_gyro_z[NUMBER_OF_SENSORS] = {0};
+#if MPU_SENSORS_SET & INV_XYZ_COMPASS
+static int64_t	mean_mag_x[NUMBER_OF_SENSORS] = {0}, mean_mag_y[NUMBER_OF_SENSORS] = {0}, mean_mag_z[NUMBER_OF_SENSORS] = {0};
+#endif
 
 ///////////////////// FUNCTIONS ///////////////////////////////
 void HAL_GPIO_EXTI_Callback( uint16_t GPIO_Pin )
@@ -324,6 +333,7 @@ void MeasurementLoop(void)
 {
 	////////////////// MEASUREMENT START //////////////////////
 	firstMeasurementLoop = true;
+	measurementMode = true;
 
 	printf("Measurement start.\n");
 
@@ -334,8 +344,8 @@ void MeasurementLoop(void)
 	////////////////// RESET FIFO /////////////////////////////
 	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
 	{
-	set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
-	IMUs[i].resetFifo();
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		IMUs[i].resetFifo();
 	}
 	printf("Fifo reset done.\n");
 	#endif
@@ -401,54 +411,74 @@ void MeasurementLoop(void)
 
 void PerformCalibration(void)
 {
-	constexpr int numberOfSamples = 200;
 	runCalibration = false;
+	measurementMode = false;
+	calibrationSamplesTaken = 0;
+
+	int64_t zerosBuff[NUMBER_OF_SENSORS] = {0};
+	memcpy(mean_acc_x, zerosBuff, sizeof(zerosBuff));
+	memcpy(mean_acc_y, zerosBuff, sizeof(zerosBuff));
+	memcpy(mean_acc_z, zerosBuff, sizeof(zerosBuff));
+	memcpy(mean_gyro_x, zerosBuff, sizeof(zerosBuff));
+	memcpy(mean_gyro_y, zerosBuff, sizeof(zerosBuff));
+	memcpy(mean_gyro_z, zerosBuff, sizeof(zerosBuff));
+#if MPU_SENSORS_SET & INV_XYZ_COMPASS
+	memcpy(mean_mag_x, zerosBuff, sizeof(zerosBuff));
+	memcpy(mean_mag_y, zerosBuff, sizeof(zerosBuff));
+	memcpy(mean_mag_z, zerosBuff, sizeof(zerosBuff));
+#endif
+
 	printf("Calibration begin...\n");
 	////////////////// SENSORS SETUP //////////////////////////
 	SetupMPUSensors();
 
-	int64_t mean_acc_x[NUMBER_OF_SENSORS] = {0}, mean_acc_y[NUMBER_OF_SENSORS] = {0}, mean_acc_z[NUMBER_OF_SENSORS] = {0};
-	int64_t mean_gyro_x[NUMBER_OF_SENSORS] = {0}, mean_gyro_y[NUMBER_OF_SENSORS] = {0}, mean_gyro_z[NUMBER_OF_SENSORS] = {0};
+	////////////////// ENABLE MPU9250 INTERRUPT /////////////////////////
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		IMUs[i].enableInterrupt(1);
+	}
+
+	uint32_t primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
+	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
+	isMpuMeasureReady = true;
+	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
 	////////////////// CALIBRATION //////////////////////////
-	for(uint8_t sample = 0; sample < numberOfSamples; ++sample) {
-		for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)	{
-			set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+	while(calibrationSamplesTaken < NUMBER_OF_CALIBRATION_SAMPLES)
+	{
+		SCH_Run(SCH_DEFAULT);
 
-			while(!IMUs[i].dataReady())
-			{
-				delay_ms(1);
-			}
-
-			if( IMUs[i].allDataUpdate(NULL, 0) == INV_SUCCESS ) {
-				mean_acc_x[i] += IMUs[i].ax;
-				mean_acc_y[i] += IMUs[i].ay;
-				mean_acc_z[i] += IMUs[i].az;
-
-				mean_gyro_x[i] += IMUs[i].gx;
-				mean_gyro_y[i] += IMUs[i].gy;
-				mean_gyro_z[i] += IMUs[i].gz;
-			}
-		}
-
-		if(sample % 10 == 0)
-			printf("Sample %d done.\n", sample);
+		if(calibrationSamplesTaken % 10 == 0)
+			printf("Sample %d done.\n", calibrationSamplesTaken);
 	}
 
 	printf("\nCalculating mean values...\n");
 	mpuDataToBeSend[0] = 'B';
 
 	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)	{
-		mean_acc_x[i] /= numberOfSamples;
-		mean_acc_y[i] /= numberOfSamples;
-		mean_acc_z[i] /= numberOfSamples;
+		mean_acc_x[i] /= NUMBER_OF_CALIBRATION_SAMPLES;
+		mean_acc_y[i] /= NUMBER_OF_CALIBRATION_SAMPLES;
+		mean_acc_z[i] /= NUMBER_OF_CALIBRATION_SAMPLES;
 		mean_acc_z[i] -= IMUs[i].getAccelSens();
 
-		mean_gyro_x[i] /= numberOfSamples;
-		mean_gyro_y[i] /= numberOfSamples;
-		mean_gyro_z[i] /= numberOfSamples;
+		mean_gyro_x[i] /= NUMBER_OF_CALIBRATION_SAMPLES;
+		mean_gyro_y[i] /= NUMBER_OF_CALIBRATION_SAMPLES;
+		mean_gyro_z[i] /= NUMBER_OF_CALIBRATION_SAMPLES;
 
-		uint8_t offset = i * 12u + 1;
+#if MPU_SENSORS_SET & INV_XYZ_COMPASS
+		mean_mag_x[i] /= NUMBER_OF_CALIBRATION_SAMPLES;
+		mean_mag_y[i] /= NUMBER_OF_CALIBRATION_SAMPLES;
+		mean_mag_z[i] /= NUMBER_OF_CALIBRATION_SAMPLES;
+
+		// Calculate length of resultant of 3 vectors
+		double resultantVector = (double)((mean_mag_x[i] * mean_mag_x[i]) + (mean_mag_y[i] * mean_mag_y[i]) + (mean_mag_z[i] * mean_mag_z[i]));
+		resultantVector = sqrt(resultantVector);
+		mean_mag_y[i] -= (int64_t)((int16_t)resultantVector);
+#endif
+
+		uint8_t offset = i * MPU_DATA_LENGTH_FOR_SENSOR + 1;
+
 		mpuDataToBeSend[offset] = (uint8_t)(mean_acc_x[i] >> 8);
 		mpuDataToBeSend[offset + 1] = (uint8_t)mean_acc_x[i];
 		mpuDataToBeSend[offset + 2] = (uint8_t)(mean_acc_y[i] >> 8);
@@ -463,13 +493,40 @@ void PerformCalibration(void)
 		mpuDataToBeSend[offset + 3] = (uint8_t)mean_gyro_y[i];
 		mpuDataToBeSend[offset + 4] = (uint8_t)(mean_gyro_z[i] >> 8);
 		mpuDataToBeSend[offset + 5] = (uint8_t)mean_gyro_z[i];
+
+#if MPU_SENSORS_SET & INV_XYZ_COMPASS
+		offset += 6;
+		mpuDataToBeSend[offset] = (uint8_t)(mean_mag_x[i] >> 8);
+		mpuDataToBeSend[offset + 1] = (uint8_t)mean_mag_x[i];
+		mpuDataToBeSend[offset + 2] = (uint8_t)(mean_mag_y[i] >> 8);
+		mpuDataToBeSend[offset + 3] = (uint8_t)mean_mag_y[i];
+		mpuDataToBeSend[offset + 4] = (uint8_t)(mean_mag_z[i] >> 8);
+		mpuDataToBeSend[offset + 5] = (uint8_t)mean_mag_z[i];
+#endif
 	}
-	mpuDataLength = NUMBER_OF_SENSORS * 12u + 1;
+	mpuDataLength = NUMBER_OF_SENSORS * MPU_DATA_LENGTH_FOR_SENSOR + 1;
+
+	primask_bit = __get_PRIMASK();  /**< backup PRIMASK bit */
+	__disable_irq();          /**< Disable all interrupts by setting PRIMASK bit on Cortex*/
+	isMpuMeasureReady = false;
+	__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
 	// Send calibration data
 	SCH_SetTask(1<<CFG_TASK_MPU_DATA_READY_ID, CFG_SCH_PRIO_1);
 
 	printf("\nCalibration done.\n");
+
+	////////////////// SENSORS RESET //////////////////////////
+	for(uint8_t i = 0u; i < NUMBER_OF_SENSORS; i++)
+	{
+		////////////////// DISABLE MPU9250 INTERRUPT /////////////////////////
+		set_CS_portpin(spiSlavesArray[i].port, spiSlavesArray[i].pin);
+		IMUs[i].enableInterrupt(0);
+		IMUs[i].resetDevice();
+	}
+	printf("Sensors reset.\n");
+
+	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 }
 
 
@@ -492,10 +549,13 @@ void ReadMpuDataCallback(void)
 	if(isMpuMeasureReady)
 	{
 		callbackCalled = true;
-		// Get timestamp
-		mpuDataToBeSend[1] = (uint8_t)(timestampInterval >> 8);
-		mpuDataToBeSend[2] = (uint8_t)timestampInterval;
-		IMUs[0].time = timestampInterval;
+
+		if(measurementMode) {
+			// Get timestamp
+			mpuDataToBeSend[1] = (uint8_t)(timestampInterval >> 8);
+			mpuDataToBeSend[2] = (uint8_t)timestampInterval;
+			IMUs[0].time = timestampInterval;
+		}
 
 		__set_PRIMASK(primask_bit); /**< Restore PRIMASK bit*/
 
@@ -546,11 +606,37 @@ void ReadMpuDataCallback(void)
 				}
 #else
 
-				// Update of IMU sensor data
-				if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * MPU_DATA_LENGTH_FOR_SENSOR + 3) == INV_ERROR)
-				{
-					printf("IMU nr %d data read error!\n", i);
-					error_result_mask |= sensorShiftedNumber;
+				if(measurementMode) {
+					// Update of IMU sensor data
+					if(IMUs[i].allDataUpdate((uint8_t*)mpuDataToBeSend, i * MPU_DATA_LENGTH_FOR_SENSOR + 3) == INV_ERROR)
+					{
+						printf("IMU nr %d data read error!\n", i);
+						error_result_mask |= sensorShiftedNumber;
+					}
+				}
+				else {
+					// Read data for calibration
+					if(IMUs[i].allDataUpdate(NULL, 0) != INV_SUCCESS)
+					{
+						printf("IMU nr %d data read error!\n", i);
+						error_result_mask |= sensorShiftedNumber;
+					}
+					else
+					{
+						mean_acc_x[i] += IMUs[i].ax;
+						mean_acc_y[i] += IMUs[i].ay;
+						mean_acc_z[i] += IMUs[i].az;
+
+						mean_gyro_x[i] += IMUs[i].gx;
+						mean_gyro_y[i] += IMUs[i].gy;
+						mean_gyro_z[i] += IMUs[i].gz;
+
+#if MPU_SENSORS_SET & INV_XYZ_COMPASS
+						mean_mag_x[i] += IMUs[i].mx;
+						mean_mag_y[i] += IMUs[i].my;
+						mean_mag_z[i] += IMUs[i].mz;
+#endif
+					}
 				}
 
 				// Add sensor to the completed mask and clear sensor ready bit
@@ -563,6 +649,7 @@ void ReadMpuDataCallback(void)
 
 #endif
 			}
+
 #if !MPU_DMP_DATA_ENABLE
 		}
 
@@ -572,19 +659,32 @@ void ReadMpuDataCallback(void)
 		}
 #endif
 
-		if(!error_result_mask) {
-			mpuDataToBeSend[0] = 'S';
-			mpuDataLength = MPU_ALL_DATA_LENGTH();
-			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-		}
-		else {
-			mpuDataToBeSend[0] = 'E';
-			mpuDataLength = 3u;
-			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-		}
+		// Send measurements only if measurement mode is on
+		if(measurementMode)
+		{
+			if(!error_result_mask) {
+				mpuDataToBeSend[0] = 'S';
+				mpuDataLength = MPU_ALL_DATA_LENGTH();
+				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+			}
+			else {
+				mpuDataToBeSend[0] = 'E';
+				mpuDataLength = 3u;
+				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+			}
 
-		// Send measurements
-		SCH_SetTask(1<<CFG_TASK_MPU_DATA_READY_ID, CFG_SCH_PRIO_1);
+			SCH_SetTask(1<<CFG_TASK_MPU_DATA_READY_ID, CFG_SCH_PRIO_1);
+		}
+		else // calibration mode
+		{
+			if(!error_result_mask) {
+				calibrationSamplesTaken++;
+				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+			}
+			else {
+				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+			}
+		}
 
 #if PRINT_FULL_DATA
 		numOfIters++;

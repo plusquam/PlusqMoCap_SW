@@ -760,19 +760,24 @@ inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offs
 
 		if(chosen_sensors & INV_XYZ_COMPASS) {
 			//Mag
-			if (!(data[14] & AKM_DATA_READY))
+			if (data[14] & AKM_DATA_READY) {
+				short mag_sens_adj[3];
+				getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
+
+				mx = (data[16] << 8) | data[15];
+				my = (data[18] << 8) | data[17];
+				mz = (data[20] << 8) | data[19];
+
+				mx = ((long)mx * mag_sens_adj[0]) >> 8;
+				my = ((long)my * mag_sens_adj[1]) >> 8;
+				mz = ((long)mz * mag_sens_adj[2]) >> 8;
+			}
+			else {
+				mx = 0;
+				my = 0;
+				mz = 0;
 				return INV_NO_MAG_DATA;
-
-			short mag_sens_adj[3];
-			getMagSensAdj(mag_sens_adj, mag_sens_adj + 1, mag_sens_adj + 2);
-
-			mx = (data[16] << 8) | data[15];
-			my = (data[18] << 8) | data[17];
-			mz = (data[20] << 8) | data[19];
-
-			mx = ((long)mx * mag_sens_adj[0]) >> 8;
-			my = ((long)my * mag_sens_adj[1]) >> 8;
-			mz = ((long)mz * mag_sens_adj[2]) >> 8;
+			}
 		}
 	}
 	else
@@ -808,8 +813,8 @@ inv_error_t MPU9250_DMP::allDataUpdate(unsigned char *buffer, unsigned char offs
 				buffer_with_offset[17] = (unsigned char)temp_mz;
 			}
 			else {
-				for(int index = 12; index < 17; ++index)
-					buffer_with_offset[index] = 0;
+				unsigned char zerosBuff[6] = {0};
+				memcpy(buffer_with_offset, zerosBuff, sizeof(zerosBuff));
 
 				return INV_NO_MAG_DATA;
 			}

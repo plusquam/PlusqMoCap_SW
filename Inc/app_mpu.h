@@ -11,6 +11,11 @@
 
 // Symbols declarations
 #define MPU_DMP_DATA_ENABLE	0 // Set to 0 for raw sensor data, 1 for DMP data
+
+#if MPU_DMP_DATA_ENABLE
+#error "DMP not implemented yet!"
+#endif
+
 #if MPU_DMP_DATA_ENABLE
 #define MPU_SAMPLE_RATE 200 //[Hz]
 #else
@@ -26,6 +31,8 @@
 #define NUMBER_OF_SENSORS		4
 #define ENABLE_SENSORS_SYNCH	0
 #define PRINT_FULL_DATA			0
+
+#define NUMBER_OF_CALIBRATION_SAMPLES	200
 
 #if MPU_SENSORS_SET & INV_XYZ_COMPASS
 #define MPU_DATA_LENGTH_FOR_SENSOR	18
